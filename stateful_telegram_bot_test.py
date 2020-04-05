@@ -26,7 +26,7 @@ class TestStatefulTelegramBotHandleUpdate(unittest.TestCase):
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_foo(self):
+    def test_handle_update(self):
         bot = StatefulTelegramBot(
             token='123:ABCDEF', logger=self.logger, db_path=self.db_path)
 
@@ -38,10 +38,15 @@ class TestStatefulTelegramBotHandleUpdate(unittest.TestCase):
         ]
 
         db = sqlite3.connect(self.db_path)
-        db.executemany(
-            'INSERT INTO messages VALUES (?,?,?,?,?,?)', existing_values)
+        db.executemany('''INSERT INTO messages 
+                          (insert_timestamp, timestamp, update_id, chat_id, chat_state, text)
+                          VALUES (?,?,?,?,?,?)''', existing_values)
         db.commit()
         db.close()
+
+        bot.init_from_db()
+
+        self.assertDictEqual({4: '', 8: ''}, bot.chat_states)
 
         updates = [
             _create_update(update_id=1101, date=datetime.fromtimestamp(
@@ -49,39 +54,52 @@ class TestStatefulTelegramBotHandleUpdate(unittest.TestCase):
             _create_update(update_id=1202, date=datetime.fromtimestamp(
                 100200305), chat_id=52002, text='World')
         ]
-        context = None
 
         for update in updates:
-            bot._handle_update(update, context)
+            bot._handle_update(update, context=None)
 
-        foo_updates = [
+        self.assertDictEqual({
+            4: '',
+            8: '',
+            51001: '',
+            52002: ''}, bot.chat_states)
+
+        bot.chat_states[51001] = 'foo'
+        bot.chat_states[52002] = 'bar'
+
+        more_updates = [
             _create_update(update_id=1303, date=datetime.fromtimestamp(
-                100200310), chat_id=53003, text='Юнікод'),
+                100200310), chat_id=51001, text='Юнікод'),
             _create_update(update_id=1404, date=datetime.fromtimestamp(
-                100200315), chat_id=54004, text='Emoji: 😎')
+                100200315), chat_id=52002, text='Emoji: 😎'),
+            _create_update(update_id=1505, date=datetime.fromtimestamp(
+                100200320), chat_id=53003, text='/start'),
+            _create_update(update_id=0, date=None, chat_id=0, text=None)
         ]
 
-        bot.set_state('foo')
+        for update in more_updates:
+            bot._handle_update(update, context=None)
 
-        for update in foo_updates:
-            bot._handle_update(update, context)
-
-        empty_update = _create_update(
-            update_id=0, date=None, chat_id=0, text=None)
-        bot.set_state('empty')
-        bot._handle_update(empty_update, context)
+        self.assertDictEqual({
+            0: '',
+            4: '',
+            8: '',
+            51001: 'foo',
+            52002: 'bar',
+            53003: ''}, bot.chat_states)
 
         db = sqlite3.connect(self.db_path)
         messages = db.execute(
-            'SELECT timestamp, update_id, chat_id, bot_state, text FROM messages').fetchall()
+            'SELECT timestamp, update_id, chat_id, chat_state, text FROM messages').fetchall()
         self.assertListEqual([
             (2, 3, 4, 'a', 'existing a'),
             (6, 7, 8, 'b', 'existing b'),
             (100200300, 1101, 51001, '', 'Hello'),
             (100200305, 1202, 52002, '', 'World'),
-            (100200310, 1303, 53003, 'foo', 'Юнікод'),
-            (100200315, 1404, 54004, 'foo', 'Emoji: 😎'),
-            (0, 0, 0, 'empty', ''),
+            (100200310, 1303, 51001, 'foo', 'Юнікод'),
+            (100200315, 1404, 52002, 'bar', 'Emoji: 😎'),
+            (100200320, 1505, 53003, '', '/start'),
+            (0, 0, 0, '', ''),
         ], messages)
         db.close()
 
