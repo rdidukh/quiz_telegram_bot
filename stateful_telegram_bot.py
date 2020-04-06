@@ -2,6 +2,7 @@ from datetime import datetime
 import logging
 import sqlite3
 import telegram
+import telegram.ext
 from typing import Dict
 
 
@@ -40,8 +41,8 @@ class StatefulTelegramBot:
 
         self.logger.info('Committing values to database...')
         db = sqlite3.connect(self.db_path)
-        db.execute('''INSERT INTO messages 
-                     (insert_timestamp, timestamp, update_id, chat_id, chat_state, text) 
+        db.execute('''INSERT INTO messages
+                     (insert_timestamp, timestamp, update_id, chat_id, chat_state, text)
                      VALUES (?, ?, ?, ?, ?, ?)''',
                    (insert_timestamp, timestamp, update_id, chat_id, state, text))
         db.commit()

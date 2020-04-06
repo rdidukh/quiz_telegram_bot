@@ -3,7 +3,6 @@ import logging
 from stateful_telegram_bot import StatefulTelegramBot
 import tempfile
 import telegram
-import telegram.ext
 import unittest
 import os
 import sqlite3
@@ -38,7 +37,7 @@ class TestStatefulTelegramBotHandleUpdate(unittest.TestCase):
         ]
 
         db = sqlite3.connect(self.db_path)
-        db.executemany('''INSERT INTO messages 
+        db.executemany('''INSERT INTO messages
                           (insert_timestamp, timestamp, update_id, chat_id, chat_state, text)
                           VALUES (?,?,?,?,?,?)''', existing_values)
         db.commit()
