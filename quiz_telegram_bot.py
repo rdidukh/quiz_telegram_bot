@@ -1,7 +1,8 @@
 import argparse
 import logging
 from quiz_http_server import QuizHttpServer
-from stateful_telegram_bot import StatefulTelegramBot
+from telegram_update_logger import TelegramUpdateLogger
+import telegram
 import sys
 from typing import List
 
@@ -34,15 +35,19 @@ def main(args: List[str]):
     logger.info('Hello!')
 
     logger.info('Launching Telegram bot...')
-    bot = StatefulTelegramBot(token=args.telegram_bot_token,
-                              logger=logger, db_path=args.message_db)
-    bot.init_from_db()
-    bot.start_polling()
+    telegram_update_logger = TelegramUpdateLogger(db_path=args.message_db, logger=logger)
+    updater = telegram.ext.Updater(args.telegram_bot_token, use_context=True)
+    updater.dispatcher.add_handler(telegram.ext.MessageHandler(telegram.ext.Filters.text, telegram_update_logger.log_update))
+    updater.dispatcher.add_error_handler(
+        lambda update, context: logger.error('Update "%s" caused error "%s"', update, context.error))
+    updater.start_polling()
     logger.info('Launching Telegram bot done.')
 
     logger.info('Starting HTTP server...')
     server = QuizHttpServer(host='localhost', port=8000, logger=logger)
     server.serve_forever()
+
+    updater.stop()
 
 
 if __name__ == "__main__":
