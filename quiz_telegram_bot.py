@@ -1,5 +1,6 @@
 import argparse
 import logging
+from messages_db import MessagesDb
 from quiz_http_server import QuizHttpServer
 from telegram_update_logger import TelegramUpdateLogger
 import telegram
@@ -11,7 +12,7 @@ def _parse_args(args: List[str]):
     parser = argparse.ArgumentParser(
         description='Application for hosting a quiz.')
     parser.add_argument('--log_file', default='quiz_telegram_bot.log')
-    parser.add_argument('--message_db', default='message.db')
+    parser.add_argument('--messages_db', default='message.db')
     parser.add_argument('--telegram_bot_token', default='', required=True)
     return parser.parse_args()
 
@@ -34,8 +35,10 @@ def main(args: List[str]):
     logger.info('')
     logger.info('Hello!')
 
+    messages_db = MessagesDb(db_path=args.messages_db)
+
     logger.info('Launching Telegram bot...')
-    telegram_update_logger = TelegramUpdateLogger(db_path=args.message_db, logger=logger)
+    telegram_update_logger = TelegramUpdateLogger(messages_db=messages_db, logger=logger)
     updater = telegram.ext.Updater(args.telegram_bot_token, use_context=True)
     updater.dispatcher.add_handler(telegram.ext.MessageHandler(telegram.ext.Filters.text, telegram_update_logger.log_update))
     updater.dispatcher.add_error_handler(

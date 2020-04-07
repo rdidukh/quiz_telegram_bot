@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+from messages_db import MessagesDb
 from telegram_update_logger import TelegramUpdateLogger
 import tempfile
 import telegram
@@ -19,6 +20,7 @@ class TestTelegramUpdateLogger(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.test_dir.name, 'messages.db')
+        self.messages_db = MessagesDb(db_path=self.db_path)
         self.logger = logging.Logger('test')
         self.logger.addHandler(logging.NullHandler())
 
@@ -26,7 +28,7 @@ class TestTelegramUpdateLogger(unittest.TestCase):
         self.test_dir.cleanup()
 
     def test_init_creates_messages_table(self):
-        TelegramUpdateLogger(db_path=self.db_path, logger=self.logger)
+        TelegramUpdateLogger(messages_db=self.messages_db, logger=self.logger)
         self.assertTrue(os.path.isfile(self.db_path))
 
         db = sqlite3.connect(self.db_path)
@@ -37,14 +39,9 @@ class TestTelegramUpdateLogger(unittest.TestCase):
 
     def test_log_update(self):
         update_logger = TelegramUpdateLogger(
-            db_path=self.db_path, logger=logging.Logger('test'))
+            messages_db=self.messages_db, logger=logging.Logger('test'))
 
-        db = sqlite3.connect(self.db_path)
-        db.execute('''INSERT INTO messages
-                          (insert_timestamp, timestamp, update_id, chat_id, text)
-                          VALUES (?,?,?,?,?)''', (1, 2, 3, 4, 'existing'))
-        db.commit()
-        db.close()
+        self.messages_db.insert_message(timestamp=1, update_id=2, chat_id=3, text='existing')
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -58,7 +55,7 @@ class TestTelegramUpdateLogger(unittest.TestCase):
             'SELECT timestamp, update_id, chat_id, text FROM messages').fetchall()
         db.close()
         self.assertListEqual([
-            (2, 3, 4, 'existing'),
+            (1, 2, 3, 'existing'),
             (1001001001, 1001, 5001, 'Hello, Юнікод! 😎'),
         ], messages)
 
