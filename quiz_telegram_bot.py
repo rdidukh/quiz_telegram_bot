@@ -1,6 +1,7 @@
 import argparse
 import logging
 from messages_db import MessagesDb
+from quizzes_db import QuizzesDb
 from telegram_update_logger import TelegramUpdateLogger
 import telegram
 from telegram_quiz import TelegramQuiz
@@ -12,7 +13,9 @@ def _parse_args(args: List[str]):
     parser = argparse.ArgumentParser(
         description='Application for hosting a quiz.')
     parser.add_argument('--log_file', default='quiz_telegram_bot.log')
-    parser.add_argument('--messages_db', default='message.db')
+    parser.add_argument('--messages_db', default='messages.db')
+    parser.add_argument('--quizzes_db', default='quizzes.db')
+    parser.add_argument('--game_id', default='default')
     parser.add_argument('--telegram_bot_token', default='', required=True)
     return parser.parse_args()
 
@@ -46,7 +49,9 @@ def main(args: List[str]):
     updater.start_polling()
     logger.info('Launching Telegram bot done.')
 
-    quiz = TelegramQuiz('game_id', updater=updater, logger=logger)
+    quizzes_db = QuizzesDb(db_path=args.quizzes_db)
+
+    quiz = TelegramQuiz(id=args.game_id, updater=updater, quizzes_db=quizzes_db, handler_group=1, logger=logger)
 
     quiz.start_registration()
 

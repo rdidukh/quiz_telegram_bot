@@ -27,14 +27,14 @@ class TelegramQuiz:
             del context.chat_data['typing_name']
             name = update.message.text
             self.logger.info(
-                f'Registered team. chat_id: {chat_id}, quiz_id: {self.id}, name: "{name}"')
+                f'Registered team. chat_id: {chat_id}, quiz_id: "{self.id}"", name: "{name}"')
             self.quizzes_db.insert_team(
                 chat_id=chat_id, quiz_id=self.id, name=name)
             self.teams[chat_id] = update.message.text
             message.reply_text(f'Your team "{name}" has been registered.')
         else:
             self.logger.info(
-                f'Requesting a team to send their name. chat_id: {chat_id}, quiz_id: {self.id}')
+                f'Requesting a team to send their name. chat_id: {chat_id}, quiz_id: "{self.id}"')
             context.chat_data['typing_name'] = True
             message.reply_text(
                 'Registration for game is open. Send us your team name.')
