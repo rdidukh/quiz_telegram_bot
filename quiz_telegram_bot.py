@@ -1,11 +1,11 @@
 import argparse
 import logging
 from messages_db import MessagesDb
-from quiz_http_server import QuizHttpServer
 from telegram_update_logger import TelegramUpdateLogger
 import telegram
-import sys
+from telegram_quiz import TelegramQuiz
 from typing import List
+import sys
 
 
 def _parse_args(args: List[str]):
@@ -46,11 +46,11 @@ def main(args: List[str]):
     updater.start_polling()
     logger.info('Launching Telegram bot done.')
 
-    logger.info('Starting HTTP server...')
-    server = QuizHttpServer(host='localhost', port=8000, logger=logger)
-    server.serve_forever()
+    quiz = TelegramQuiz('game_id', updater=updater, logger=logger)
 
-    updater.stop()
+    quiz.start_registration()
+
+    updater.idle()
 
 
 if __name__ == "__main__":
