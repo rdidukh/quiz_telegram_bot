@@ -79,13 +79,44 @@ class TestTelegramQuiz(unittest.TestCase):
         quiz.stop_registration()
         self.assertDictEqual({}, self.updater.dispatcher.handlers)
 
-    def test_stop_registration(self):
+    @patch('telegram.ext.CallbackContext')
+    def test_handle_answer_update(self, mock_callback_context):
+        self.quizzes_db.insert_answer(
+            chat_id=5001, quiz_id='test', question_id='q1', team_name='', answer='Apple', timestamp=1)
+        self.quizzes_db.insert_answer(
+            chat_id=5002, quiz_id='test', question_id='q1', team_name='', answer='Orange', timestamp=2)
+        self.quizzes_db.insert_answer(
+            chat_id=5001, quiz_id='test2', question_id='q1', team_name='', answer='Pear', timestamp=3)
         quiz = TelegramQuiz(id='test', updater=self.updater,
                             quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
-        quiz.start_registration()
-        self.assertIsNotNone(quiz.registration_handler)
+
+        update = telegram.update.Update(1001, message=telegram.message.Message(
+            2001, None,
+            datetime.fromtimestamp(1001001001),
+            chat=telegram.Chat(5001, 'private'), text='Banana'))
+
+        quiz.start_question(question_id='q1')
+        quiz._handle_answer_update(update, context=None)
+        quiz.stop_question()
+
+        expected_answers = {'q1': {5001: 'Banana', 5002: 'Orange'}}
+        self.assertDictEqual(expected_answers, quiz.answers)
         self.assertDictEqual(
-            {1: [quiz.registration_handler]}, self.updater.dispatcher.handlers)
+            expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
+
+        update = telegram.update.Update(1001, message=telegram.message.Message(
+            2001, None,
+            datetime.fromtimestamp(1001001001),
+            chat=telegram.Chat(5001, 'private'), text='London'))
+
+        quiz.start_question(question_id='q2')
+        quiz._handle_answer_update(update, context=None)
+        quiz.stop_question()
+
+        expected_answers = {'q1': {5001: 'Banana', 5002: 'Orange'}, 'q2': {5001: 'London'}}
+        self.assertDictEqual(expected_answers, quiz.answers)
+        self.assertDictEqual(
+            expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
 
 
 if __name__ == '__main__':
