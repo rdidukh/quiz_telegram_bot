@@ -64,6 +64,9 @@ class TelegramQuiz:
         self.registration_handler = None
         self.logger.info(f'Registration for game "{self.id}" has ended.')
 
+    def is_registration(self) -> bool:
+        return self.registration_handler is not None
+
     def _handle_answer_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
         chat_id = update.message.chat_id
         answer = update.message.text
@@ -76,6 +79,7 @@ class TelegramQuiz:
                          f'team: "{team_name}", answer: "{answer}"')
         self.quizzes_db.insert_answer(chat_id=chat_id, quiz_id=self.id,
                                       question_id=self.question_id, team_name=team_name, answer=answer)
+        update.message.reply_text(f'You answer received: "{answer}".')
         if self.question_id not in self.answers:
             self.answers[self.question_id] = {}
         self.answers[self.question_id][chat_id] = answer

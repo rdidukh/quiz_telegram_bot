@@ -94,6 +94,7 @@ class TestTelegramQuiz(unittest.TestCase):
             2001, None,
             datetime.fromtimestamp(1001001001),
             chat=telegram.Chat(5001, 'private'), text='Banana'))
+        update.message.reply_text = MagicMock()
 
         quiz.start_question(question_id='q1')
         quiz._handle_answer_update(update, context=None)
@@ -103,11 +104,13 @@ class TestTelegramQuiz(unittest.TestCase):
         self.assertDictEqual(expected_answers, quiz.answers)
         self.assertDictEqual(
             expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
+        update.message.reply_text.assert_called_once()
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
             datetime.fromtimestamp(1001001001),
             chat=telegram.Chat(5001, 'private'), text='London'))
+        update.message.reply_text = MagicMock()
 
         quiz.start_question(question_id='q2')
         quiz._handle_answer_update(update, context=None)
@@ -117,6 +120,7 @@ class TestTelegramQuiz(unittest.TestCase):
         self.assertDictEqual(expected_answers, quiz.answers)
         self.assertDictEqual(
             expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
+        update.message.reply_text.assert_called_once()
 
 
 if __name__ == '__main__':

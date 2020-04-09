@@ -1,9 +1,10 @@
 import argparse
 import logging
 from messages_db import MessagesDb
+from quiz_http_server import QuizHttpServer
 from quizzes_db import QuizzesDb
-from telegram_update_logger import TelegramUpdateLogger
 import telegram
+from telegram_update_logger import TelegramUpdateLogger
 from telegram_quiz import TelegramQuiz
 from typing import List
 import sys
@@ -53,9 +54,11 @@ def main(args: List[str]):
 
     quiz = TelegramQuiz(id=args.game_id, updater=updater, quizzes_db=quizzes_db, handler_group=1, logger=logger)
 
-    quiz.start_registration()
+    server = QuizHttpServer(host='localhost', port=8000, quiz=quiz, logger=logger)
 
-    updater.idle()
+    server.serve_forever()
+
+    updater.stop()
 
 
 if __name__ == "__main__":
