@@ -18,6 +18,8 @@ def _parse_args(args: List[str]):
     parser.add_argument('--quizzes_db', default='quizzes.db')
     parser.add_argument('--game_id', default='default')
     parser.add_argument('--telegram_bot_token', default='', required=True)
+    parser.add_argument('--warmup_questions', default=2)
+    parser.add_argument('--questions', default=30)
     return parser.parse_args()
 
 
@@ -42,9 +44,11 @@ def main(args: List[str]):
     messages_db = MessagesDb(db_path=args.messages_db)
 
     logger.info('Launching Telegram bot...')
-    telegram_update_logger = TelegramUpdateLogger(messages_db=messages_db, logger=logger)
+    telegram_update_logger = TelegramUpdateLogger(
+        messages_db=messages_db, logger=logger)
     updater = telegram.ext.Updater(args.telegram_bot_token, use_context=True)
-    updater.dispatcher.add_handler(telegram.ext.MessageHandler(telegram.ext.Filters.text, telegram_update_logger.log_update))
+    updater.dispatcher.add_handler(telegram.ext.MessageHandler(
+        telegram.ext.Filters.text, telegram_update_logger.log_update))
     updater.dispatcher.add_error_handler(
         lambda update, context: logger.error('Update "%s" caused error "%s"', update, context.error))
     updater.start_polling()
@@ -52,9 +56,16 @@ def main(args: List[str]):
 
     quizzes_db = QuizzesDb(db_path=args.quizzes_db)
 
-    quiz = TelegramQuiz(id=args.game_id, updater=updater, quizzes_db=quizzes_db, handler_group=1, logger=logger)
+    question_set = {f'{i:02}' for i in range(1, args.questions + 1)}
+    question_set = question_set.union({f'{i:02}' for i in range(-args.warmup_questions, 0)})
 
-    server = QuizHttpServer(host='localhost', port=8000, quiz=quiz, logger=logger)
+    logger.info(f'Question set: {question_set}')
+
+    quiz = TelegramQuiz(id=args.game_id, updater=updater, question_set=question_set,
+                        quizzes_db=quizzes_db, handler_group=1, logger=logger)
+
+    server = QuizHttpServer(host='localhost', port=8000,
+                            quiz=quiz, logger=logger)
 
     server.serve_forever()
 

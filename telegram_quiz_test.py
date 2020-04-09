@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-from telegram_quiz import TelegramQuiz
+from telegram_quiz import TelegramQuiz, TelegramQuizError
 from quizzes_db import QuizzesDb
 import tempfile
 import telegram
@@ -32,7 +32,7 @@ class TestTelegramQuiz(unittest.TestCase):
         self.quizzes_db.insert_team(
             chat_id=5001, quiz_id='test', name='OldName', timestamp=100)
 
-        quiz = TelegramQuiz(id='test', updater=self.updater,
+        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'1'},
                             quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
 
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'OldName'}, quiz.teams)
@@ -64,7 +64,7 @@ class TestTelegramQuiz(unittest.TestCase):
                              self.quizzes_db.select_teams(quiz_id='test'))
 
     def test_start_stop_registration(self):
-        quiz = TelegramQuiz(id='test', updater=self.updater,
+        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1'},
                             quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
         self.assertDictEqual({}, self.updater.dispatcher.handlers)
         quiz.start_registration()
@@ -87,7 +87,7 @@ class TestTelegramQuiz(unittest.TestCase):
             chat_id=5002, quiz_id='test', question_id='q1', team_name='', answer='Orange', timestamp=2)
         self.quizzes_db.insert_answer(
             chat_id=5001, quiz_id='test2', question_id='q1', team_name='', answer='Pear', timestamp=3)
-        quiz = TelegramQuiz(id='test', updater=self.updater,
+        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1', 'q2'},
                             quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
@@ -116,11 +116,30 @@ class TestTelegramQuiz(unittest.TestCase):
         quiz._handle_answer_update(update, context=None)
         quiz.stop_question()
 
-        expected_answers = {'q1': {5001: 'Banana', 5002: 'Orange'}, 'q2': {5001: 'London'}}
+        expected_answers = {'q1': {5001: 'Banana',
+                                   5002: 'Orange'}, 'q2': {5001: 'London'}}
         self.assertDictEqual(expected_answers, quiz.answers)
         self.assertDictEqual(
             expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
         update.message.reply_text.assert_called_once()
+
+    def test_start_stop_question(self):
+        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1'},
+                            quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
+        self.assertDictEqual({}, self.updater.dispatcher.handlers)
+        quiz.start_question(question_id='q1')
+        self.assertEqual(quiz._handle_answer_update,
+                         self.updater.dispatcher.handlers[1][0].callback)
+        self.assertEqual('q1', quiz.question_id)
+
+        self.assertRaises(TelegramQuizError,
+                          quiz.start_question, question_id='q1')
+
+        quiz.stop_question()
+        self.assertDictEqual({}, self.updater.dispatcher.handlers)
+        self.assertIsNone(quiz.question_id)
+
+        self.assertRaises(TelegramQuizError, quiz.stop_question)
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ class TestQuizHttpServer(unittest.TestCase):
         self.logger.addHandler(logging.NullHandler())
         self.updater = telegram.ext.Updater(
             token='123:TOKEN', use_context=True)
-        self.quiz = TelegramQuiz(id='test', updater=self.updater,
+        self.quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1', 'q2'},
                                  quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
         self.server = QuizHttpServer(
             host='localhost', port=0, quiz=self.quiz, logger=self.logger)
@@ -82,6 +82,17 @@ class TestQuizHttpServer(unittest.TestCase):
         }, response.json())
         self.assertEqual('q1', self.quiz.question_id)
 
+    def test_start_wrong_question(self):
+        response = requests.post(self.url, json={
+            'command': 'start_question',
+            'question_id': 'unexisting',
+        })
+        self.assertEqual(400, response.status_code)
+        self.assertDictContainsSubset({
+            'ok': False,
+        }, response.json())
+        self.assertIsNone(self.quiz.question_id)
+
     def test_stop_question(self):
         self.quiz.start_question('q1')
         response = requests.post(self.url, json={
@@ -103,7 +114,7 @@ class TestQuizHttpServer(unittest.TestCase):
         self.quiz.answers = {
             'q1': {
                 3: 'Apple',
-                4: 'Banana',
+                4: 'Юнікод',
             },
             'q2': {
                 5: 'Mars',
@@ -119,11 +130,12 @@ class TestQuizHttpServer(unittest.TestCase):
             'quiz_id': 'test',
             'is_registration': False,
             'question_id': 'q2',
+            'question_set': ['q1', 'q2'],
             'teams': {'1': 'Barcelona', '2': 'Real Madrid', '3': 'Liverpool'},
             'answers': {
                 'q1': {
                     '3': 'Apple',
-                    '4': 'Banana',
+                    '4': 'Юнікод',
                 },
                 'q2': {
                     '5': 'Mars',

@@ -1,11 +1,11 @@
 import http.server
 import json
 import logging
-from telegram_quiz import TelegramQuiz
+from telegram_quiz import TelegramQuiz, TelegramQuizError
 from typing import Any, Dict
 
 
-class QuizHttpRequestHandler(http.server.BaseHTTPRequestHandler):
+class QuizHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
     def _do_post(self, server: 'QuizHttpServer') -> Dict[str, Any]:
         length = int(self.headers.get('Content-Length'))
         data = self.rfile.read(length)
@@ -36,6 +36,7 @@ class QuizHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                 'quiz_id': server.quiz.id,
                 'teams': server.quiz.teams,
                 'answers': server.quiz.answers,
+                'question_set': sorted(list(server.quiz.question_set)),
                 'question_id': server.quiz.question_id,
                 'is_registration': server.quiz.is_registration()
             }
@@ -53,12 +54,16 @@ class QuizHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                 status_code = 200
             else:
                 status_code = 400
+        except TelegramQuizError as e:
+            server.logger.warning(f'quiz error: {e}')
+            response = {'ok': False, 'error': str(e)}
+            status_code = 400
         except Exception:
             server.logger.exception('_do_post error')
             response = {'ok': False, 'error': 'Internal server error'}
             status_code = 501
         self.send_response(status_code)
-        self.send_header('Content-Type', 'text/json')
+        self.send_header('Content-Type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps(response).encode('utf-8'))
 

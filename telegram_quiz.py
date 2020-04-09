@@ -1,18 +1,24 @@
 import logging
 from quizzes_db import QuizzesDb
 import telegram.ext
-from typing import Dict
+from typing import Dict, Set
+
+
+class TelegramQuizError(Exception):
+    pass
 
 
 class TelegramQuiz:
     def __init__(self, *, id: str,
                  updater: telegram.ext.Updater,
                  quizzes_db: QuizzesDb,
+                 question_set: Set[str],
                  handler_group: int,
                  logger: logging.Logger):
         self.id = id
         self.updater = updater
         self.quizzes_db = quizzes_db
+        self.question_set = question_set
         self.logger = logger
         self.handler_group = handler_group
         self.teams: Dict[int, str] = quizzes_db.select_teams(quiz_id=id)
@@ -88,11 +94,18 @@ class TelegramQuiz:
         if self.registration_handler:
             self.logger.warning(f'Trying to start question "{question_id}" for game "{self.id}", '
                                 f'but the registration is not finished.')
-            return
+            raise TelegramQuizError(
+                'Can not start a question during registration.')
         if self.question_id:
             self.logger.warning(f'Trying to start question "{question_id}" for game "{self.id}", '
                                 f'but question "{self.question_id}" is already started.')
-            return
+            raise TelegramQuizError(
+                'Can not start a question during another question.')
+        if question_id not in self.question_set:
+            self.logger.warning(f'Trying to start question "{question_id}" for game "{self.id}", '
+                                f'but it is not in the question set.')
+            raise TelegramQuizError(
+                f'Can not start question "{question_id}" which is not in the question set.')
         self.question_handler = telegram.ext.MessageHandler(
             telegram.ext.Filters.text, self._handle_answer_update)
         self.updater.dispatcher.add_handler(
@@ -105,7 +118,8 @@ class TelegramQuiz:
         if not self.question_id:
             self.logger.warning(
                 f'Attempt to stop a question, but no question was running. quiz_id: "{self.id}".')
-            return
+            raise TelegramQuizError(
+                'Can not stop a question, when no question is running.')
         self.updater.dispatcher.remove_handler(
             self.question_handler, group=self.handler_group)
         self.question_id = None
