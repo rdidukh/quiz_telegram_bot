@@ -1,7 +1,13 @@
 function addTableRow(table, values) {
     var tr = document.createElement('tr')
     for (i in values) {
-        tr.appendChild(document.createElement('td')).innerHTML = values[i]
+        value = values[i]
+
+        if (value instanceof HTMLElement) {
+            tr.appendChild(document.createElement('td')).appendChild(value)
+        } else {
+            tr.appendChild(document.createElement('td')).innerHTML = value
+        }
     }
     table.appendChild(tr)
 }
@@ -13,6 +19,7 @@ function updateStatusTable(status) {
     addTableRow(table, ["Quiz", status.quiz_id])
     addTableRow(table, ["Question", status.question_id])
     addTableRow(table, ["Registration", status.is_registration])
+    addTableRow(table, ["Last updated", new Date()])
 }
 
 function updateTeamsTable(status) {
@@ -27,41 +34,88 @@ function updateAnswersTable(status) {
     var table = document.getElementById('answers')
     table.innerHTML = ''
     team_ids = Object.keys(status.teams);
-    teams_array = team_ids.map(function(id){
+    teams_array = team_ids.map(function (id) {
         return status.teams[id]
     })
 
     question_set = status.question_set.sort()
-    addTableRow(table, [' '].concat(teams_array))
-    for (i in question_set) {
-        question_id = question_set[i];
-        answers = team_ids.map(function(id) {
+    addTableRow(table, ['', ''].concat(teams_array))
+    for (const i in question_set) {
+        let question_id = question_set[i];
+        answers = team_ids.map(function (id) {
             if (question_id in status.answers) {
                 return status.answers[question_id][id]
             } else {
                 return ''
             }
         })
-        addTableRow(table, [question_id].concat(answers))
+
+        startButton = document.createElement('button')
+        startButton.innerHTML = 'Start'
+        startButton.onclick = function () {
+            sendCommand({ "command": "start_question", "question_id": question_id }, function (response) {
+                console.log("Question '" + question_id + "' started!")
+            }, function (error) {
+                console.log("Could not start question: " + error)
+            })
+        }
+
+        addTableRow(table, [startButton, question_id].concat(answers))
     }
 }
 
-function getStatus() {
+function sendCommand(command, callback, error_callback) {
     var xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function () {
         if (this.readyState == 4) {
+            var response = JSON.parse(this.responseText);
             if (this.status != 200) {
                 console.warn('Status code: ' + this.status)
-                console.log(this.responseText)
+                error_callback(response.error)
             } else {
-                var response = JSON.parse(this.responseText);
-                updateStatusTable(response)
-                updateTeamsTable(response)
-                updateAnswersTable(response)
+                callback(response);
             }
         }
-    };
+    }
     xhttp.open("POST", "/", true);
     xhttp.setRequestHeader("Content-type", "application/json");
-    xhttp.send('{"command": "get_status"}');
+    xhttp.send(JSON.stringify(command));
+}
+
+function getStatus() {
+    sendCommand({ "command": "get_status" }, function (response) {
+        updateStatusTable(response)
+        updateTeamsTable(response)
+        updateAnswersTable(response)
+    }, function (error) {
+        console.log('Could not get status: ' + error)
+    })
+}
+
+function startRegistration() {
+    sendCommand({ "command": "start_registration" }, function (response) {
+        console.log('Registration started!')
+    }, function (error) {
+        console.warn('Could not start registration: ' + error)
+    })
+}
+
+function stopRegistration() {
+    sendCommand({ "command": "stop_registration" }, function (response) {
+        console.log('Registration stopped!')
+    }, function (error) {
+        console.warn('Could not stop registration: ' + error)
+    })
+}
+
+function stopQuestion() {
+    sendCommand({ "command": "stop_question" }, function (response) {
+        console.log('Question stopped!')
+    }, function (error) {
+        console.warn('Could not stop question: ' + error)
+    })
+}
+
+function onLoad() {
+    setInterval(getStatus, 1000)
 }
