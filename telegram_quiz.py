@@ -10,23 +10,21 @@ class TelegramQuizError(Exception):
 
 class TelegramQuiz:
     def __init__(self, *, id: str,
-                 updater: telegram.ext.Updater,
+                 bot_token: str,
                  quizzes_db: QuizzesDb,
                  question_set: Set[str],
-                 handler_group: int,
                  logger: logging.Logger):
         self.id = id
-        self.updater = updater
         self.quizzes_db = quizzes_db
         self.question_set = question_set
         self.logger = logger
-        self.handler_group = handler_group
         self.teams: Dict[int, str] = quizzes_db.select_teams(quiz_id=id)
         self.answers: Dict[str, Dict[int, str]
                            ] = quizzes_db.select_all_answers(quiz_id=id)
         self.registration_handler: telegram.ext.MessageHandler = None
         self.question_handler: telegram.ext.MessageHandler = None
         self.question_id = None
+        self.updater = telegram.ext.Updater(bot_token, use_context=True)
 
     def _handle_registration_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
         chat_id = update.message.chat_id
@@ -64,7 +62,7 @@ class TelegramQuiz:
         self.registration_handler = telegram.ext.MessageHandler(
             telegram.ext.Filters.text, self._handle_registration_update)
         self.updater.dispatcher.add_handler(
-            self.registration_handler, group=self.handler_group)
+            self.registration_handler, group=1)
         self.logger.info(f'Registration for game "{self.id}" has started.')
 
     def stop_registration(self):
@@ -74,7 +72,7 @@ class TelegramQuiz:
             raise TelegramQuizError(
                 f'Can not stop registration of quiz "{self.id}" because registration is not running.')
         self.updater.dispatcher.remove_handler(
-            self.registration_handler, group=self.handler_group)
+            self.registration_handler, group=1)
         self.registration_handler = None
         self.logger.info(f'Registration for game "{self.id}" has ended.')
 
@@ -117,7 +115,7 @@ class TelegramQuiz:
         self.question_handler = telegram.ext.MessageHandler(
             telegram.ext.Filters.text, self._handle_answer_update)
         self.updater.dispatcher.add_handler(
-            self.question_handler, group=self.handler_group)
+            self.question_handler, group=1)
         self.question_id = question_id
         self.logger.info(
             f'Question "{question_id}" for game "{self.id}" has started.')
@@ -129,7 +127,7 @@ class TelegramQuiz:
             raise TelegramQuizError(
                 'Can not stop a question, when no question is running.')
         self.updater.dispatcher.remove_handler(
-            self.question_handler, group=self.handler_group)
+            self.question_handler, group=1)
         self.question_id = None
         self.question_handler = None
         self.logger.info(
@@ -152,3 +150,16 @@ class TelegramQuiz:
         self.quizzes_db.insert_message(Message(
             timestamp=timestamp, update_id=update_id, chat_id=chat_id, text=text))
         self.logger.info('Committing values to database done.')
+
+    def _handle_error(self, update, context):
+        self.logger.error('Update "%s" caused error "%s"',
+                          update, context.error)
+
+    def start(self):
+        self.updater.dispatcher.add_error_handler(self._handle_error)
+        self.updater.dispatcher.add_handler(telegram.ext.MessageHandler(
+            telegram.ext.Filters.text, self._handle_log_update))
+        self.updater.start_polling()
+
+    def stop(self):
+        self.updater.stop()

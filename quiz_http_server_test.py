@@ -19,8 +19,8 @@ class TestQuizHttpServer(unittest.TestCase):
         self.logger.addHandler(logging.NullHandler())
         self.updater = telegram.ext.Updater(
             token='123:TOKEN', use_context=True)
-        self.quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1', 'q2'},
-                                 quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
+        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1', 'q2'},
+                                 quizzes_db=self.quizzes_db, logger=self.logger)
         self.server = QuizHttpServer(
             host='localhost', port=0, quiz=self.quiz, logger=self.logger)
         self.url = f'http://localhost:{self.server.server_port}/'

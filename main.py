@@ -2,7 +2,6 @@ import argparse
 import logging
 from quiz_http_server import QuizHttpServer
 from quizzes_db import QuizzesDb
-import telegram
 from telegram_quiz import TelegramQuiz
 from typing import List
 import sys
@@ -14,7 +13,7 @@ def _parse_args(args: List[str]):
     parser.add_argument('--log_file', default='quiz_telegram_bot.log')
     parser.add_argument('--quizzes_db', default='quizzes.db')
     parser.add_argument('--game_id', default='default')
-    parser.add_argument('--telegram_bot_token', default='', required=True)
+    parser.add_argument('--telegram-bot-token', required=True)
     parser.add_argument('--warmup_questions', default=2)
     parser.add_argument('--questions', default=30)
     return parser.parse_args()
@@ -38,10 +37,6 @@ def main(args: List[str]):
     logger.info('')
     logger.info('Hello!')
 
-    updater = telegram.ext.Updater(args.telegram_bot_token, use_context=True)
-    updater.dispatcher.add_error_handler(
-        lambda update, context: logger.error('Update "%s" caused error "%s"', update, context.error))
-
     quizzes_db = QuizzesDb(db_path=args.quizzes_db)
 
     question_set = {f'{i:02}' for i in range(1, args.questions + 1)}
@@ -50,18 +45,13 @@ def main(args: List[str]):
 
     logger.info(f'Question set: {question_set}')
 
-    quiz = TelegramQuiz(id=args.game_id, updater=updater, question_set=question_set,
-                        quizzes_db=quizzes_db, handler_group=1, logger=logger)
-
-    updater.dispatcher.add_handler(telegram.ext.MessageHandler(
-        telegram.ext.Filters.text, quiz._handle_log_update))
-
-    updater.start_polling()
+    quiz = TelegramQuiz(id=args.game_id, bot_token=args.telegram_bot_token,
+                        question_set=question_set,
+                        quizzes_db=quizzes_db, logger=logger)
 
     server = QuizHttpServer(host='localhost', port=8000,
                             quiz=quiz, logger=logger)
     server.serve_forever()
-    updater.stop()
 
 
 if __name__ == "__main__":

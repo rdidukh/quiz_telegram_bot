@@ -18,8 +18,6 @@ class TestTelegramQuiz(unittest.TestCase):
         self.quizzes_db = QuizzesDb(db_path=self.db_path)
         self.logger = logging.Logger('test')
         self.logger.addHandler(logging.NullHandler())
-        self.updater = telegram.ext.Updater(
-            token='123:TOKEN', use_context=True)
 
     def tearDown(self):
         self.test_dir.cleanup()
@@ -32,8 +30,8 @@ class TestTelegramQuiz(unittest.TestCase):
         self.quizzes_db.insert_team(
             chat_id=5001, quiz_id='test', name='OldName', timestamp=100)
 
-        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'1'},
-                            quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'1'},
+                            quizzes_db=self.quizzes_db, logger=self.logger)
 
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'OldName'}, quiz.teams)
 
@@ -64,19 +62,19 @@ class TestTelegramQuiz(unittest.TestCase):
                              self.quizzes_db.select_teams(quiz_id='test'))
 
     def test_start_stop_registration(self):
-        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1'},
-                            quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
-        self.assertDictEqual({}, self.updater.dispatcher.handlers)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1'},
+                            quizzes_db=self.quizzes_db, logger=self.logger)
+        self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
         quiz.start_registration()
         self.assertEqual(quiz._handle_registration_update,
-                         self.updater.dispatcher.handlers[1][0].callback)
+                         quiz.updater.dispatcher.handlers[1][0].callback)
 
         self.assertRaises(TelegramQuizError, quiz.start_registration)
         self.assertEqual(quiz._handle_registration_update,
-                         self.updater.dispatcher.handlers[1][0].callback)
+                         quiz.updater.dispatcher.handlers[1][0].callback)
 
         quiz.stop_registration()
-        self.assertDictEqual({}, self.updater.dispatcher.handlers)
+        self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
 
         self.assertRaises(TelegramQuizError, quiz.stop_registration)
 
@@ -97,8 +95,8 @@ class TestTelegramQuiz(unittest.TestCase):
         self.quizzes_db.insert_answer(
             chat_id=5001, quiz_id='test2', question_id='q1', team_name='', answer='Pear', timestamp=3)
 
-        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1', 'q2'},
-                            quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1', 'q2'},
+                            quizzes_db=self.quizzes_db, logger=self.logger)
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -150,26 +148,26 @@ class TestTelegramQuiz(unittest.TestCase):
         update.message.reply_text.assert_called_once()
 
     def test_start_stop_question(self):
-        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1'},
-                            quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
-        self.assertDictEqual({}, self.updater.dispatcher.handlers)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1'},
+                            quizzes_db=self.quizzes_db, logger=self.logger)
+        self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
         quiz.start_question(question_id='q1')
         self.assertEqual(quiz._handle_answer_update,
-                         self.updater.dispatcher.handlers[1][0].callback)
+                         quiz.updater.dispatcher.handlers[1][0].callback)
         self.assertEqual('q1', quiz.question_id)
 
         self.assertRaises(TelegramQuizError,
                           quiz.start_question, question_id='q1')
 
         quiz.stop_question()
-        self.assertDictEqual({}, self.updater.dispatcher.handlers)
+        self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
         self.assertIsNone(quiz.question_id)
 
         self.assertRaises(TelegramQuizError, quiz.stop_question)
 
     def test_handle_log_update(self):
-        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1'},
-                            quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1'},
+                            quizzes_db=self.quizzes_db, logger=self.logger)
 
         self.quizzes_db.insert_message(
             Message(timestamp=1, update_id=2, chat_id=3, text='existing'))
