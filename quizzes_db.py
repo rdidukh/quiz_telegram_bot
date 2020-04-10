@@ -1,7 +1,17 @@
 import contextlib
 from datetime import datetime
+from dataclasses import dataclass, field
 import sqlite3
-from typing import Dict
+from typing import Dict, List
+
+
+@dataclass
+class Message:
+    timestamp: int
+    update_id: int
+    chat_id: int
+    text: str
+    insert_timestamp: int = field(default=0, compare=False)
 
 
 class QuizzesDb:
@@ -31,6 +41,16 @@ class QuizzesDb:
                      (timestamp, chat_id, quiz_id, question_id, team_name, answer)
                      VALUES (?, ?, ?, ?, ?, ?)''', (timestamp, chat_id, quiz_id, question_id, team_name, answer))
 
+    def insert_message(self, message: Message):
+        insert_timestamp = message.insert_timestamp or int(
+            datetime.utcnow().timestamp())
+        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                db.execute('''INSERT INTO messages
+                           (insert_timestamp, timestamp, update_id, chat_id, text)
+                           VALUES (?, ?, ?, ?, ?)''',
+                           (insert_timestamp, message.timestamp, message.update_id, message.chat_id, message.text))
+
     def select_teams(self, *, quiz_id: str) -> Dict[int, str]:
         teams: Dict[int, str] = {}
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
@@ -53,6 +73,22 @@ class QuizzesDb:
                     answers[question_id][chat_id] = answer
         return answers
 
+    def select_messages(self) -> List[Message]:
+        messages: List[Message] = []
+        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            db.row_factory = sqlite3.Row
+            with db:
+                cursor = db.execute(
+                    'SELECT insert_timestamp, timestamp, update_id, chat_id, text FROM messages')
+                for row in cursor:
+                    message = Message(insert_timestamp=row['insert_timestamp'],
+                                      timestamp=row['timestamp'],
+                                      update_id=row['update_id'],
+                                      chat_id=row['chat_id'],
+                                      text=row['text'])
+                    messages.append(message)
+        return messages
+
     def create_if_not_exists(self):
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
@@ -68,3 +104,9 @@ class QuizzesDb:
                     question_id TEXT NOT NULL,
                     team_name TEXT NOT NULL,
                     answer TEXT NOT NULL)''')
+                db.execute('''CREATE TABLE IF NOT EXISTS messages (
+                    insert_timestamp INTEGER NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    update_id INTEGER NOT NULL,
+                    chat_id INTEGER NOT NULL,
+                    text TEXT NOT NULL)''')

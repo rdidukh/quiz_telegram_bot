@@ -1,5 +1,5 @@
 import logging
-from quizzes_db import QuizzesDb
+from quizzes_db import Message, QuizzesDb
 import telegram.ext
 from typing import Dict, Set
 
@@ -37,7 +37,7 @@ class TelegramQuiz:
             del context.chat_data['typing_name']
             name = update.message.text
             self.logger.info(
-                f'Registration message. chat_id: {chat_id}, quiz_id: "{self.id}"", name: "{name}"')
+                f'Registration message. chat_id: {chat_id}, quiz_id: "{self.id}", name: "{name}"')
             message.reply_text(f'Your team "{name}" has been registered.')
             self.quizzes_db.insert_team(
                 chat_id=chat_id, quiz_id=self.id, name=name)
@@ -126,3 +126,20 @@ class TelegramQuiz:
         self.question_handler = None
         self.logger.info(
             f'Question "{self.question_id}" for game "{self.id}" has ended.')
+
+    def _handle_log_update(self, update: telegram.update.Update, context):
+        update_id = update.update_id or 0
+        message: telegram.message.Message = update.message
+        if not message:
+            self.logger.warning(f'Telegram update with no message. update_id: {update_id}.')
+            return
+        timestamp = int(message.date.timestamp()) if message.date else 0
+        chat_id = message.chat_id or 0
+        text = message.text or ''
+
+        self.logger.info(
+            f'message: timestamp:{timestamp}, chat_id:{chat_id}, text: "{text}"')
+        self.logger.info('Committing values to database...')
+        self.quizzes_db.insert_message(Message(
+            timestamp=timestamp, update_id=update_id, chat_id=chat_id, text=text))
+        self.logger.info('Committing values to database done.')

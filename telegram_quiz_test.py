@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 from telegram_quiz import TelegramQuiz, TelegramQuizError
-from quizzes_db import QuizzesDb
+from quizzes_db import Message, QuizzesDb
 import tempfile
 import telegram
 import telegram.ext
@@ -140,6 +140,26 @@ class TestTelegramQuiz(unittest.TestCase):
         self.assertIsNone(quiz.question_id)
 
         self.assertRaises(TelegramQuizError, quiz.stop_question)
+
+    def test_handle_log_update(self):
+        quiz = TelegramQuiz(id='test', updater=self.updater, question_set={'q1'},
+                            quizzes_db=self.quizzes_db, handler_group=1, logger=self.logger)
+
+        self.quizzes_db.insert_message(
+            Message(timestamp=1, update_id=2, chat_id=3, text='existing'))
+
+        update = telegram.update.Update(1001, message=telegram.message.Message(
+            2001, None,
+            datetime.fromtimestamp(1001001001),
+            chat=telegram.Chat(5001, 'private'), text='Hello, Юнікод! 😎'))
+
+        quiz._handle_log_update(update, context=None)
+
+        self.assertListEqual([
+            Message(timestamp=1, update_id=2, chat_id=3, text='existing'),
+            Message(timestamp=1001001001, update_id=1001,
+                    chat_id=5001, text='Hello, Юнікод! 😎'),
+        ], self.quizzes_db.select_messages())
 
 
 if __name__ == '__main__':

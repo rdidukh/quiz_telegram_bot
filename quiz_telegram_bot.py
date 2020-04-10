@@ -1,10 +1,8 @@
 import argparse
 import logging
-from messages_db import MessagesDb
 from quiz_http_server import QuizHttpServer
 from quizzes_db import QuizzesDb
 import telegram
-from telegram_update_logger import TelegramUpdateLogger
 from telegram_quiz import TelegramQuiz
 from typing import List
 import sys
@@ -14,7 +12,6 @@ def _parse_args(args: List[str]):
     parser = argparse.ArgumentParser(
         description='Application for hosting a quiz.')
     parser.add_argument('--log_file', default='quiz_telegram_bot.log')
-    parser.add_argument('--messages_db', default='messages.db')
     parser.add_argument('--quizzes_db', default='quizzes.db')
     parser.add_argument('--game_id', default='default')
     parser.add_argument('--telegram_bot_token', default='', required=True)
@@ -41,34 +38,29 @@ def main(args: List[str]):
     logger.info('')
     logger.info('Hello!')
 
-    messages_db = MessagesDb(db_path=args.messages_db)
-
-    logger.info('Launching Telegram bot...')
-    telegram_update_logger = TelegramUpdateLogger(
-        messages_db=messages_db, logger=logger)
     updater = telegram.ext.Updater(args.telegram_bot_token, use_context=True)
-    updater.dispatcher.add_handler(telegram.ext.MessageHandler(
-        telegram.ext.Filters.text, telegram_update_logger.log_update))
     updater.dispatcher.add_error_handler(
         lambda update, context: logger.error('Update "%s" caused error "%s"', update, context.error))
-    updater.start_polling()
-    logger.info('Launching Telegram bot done.')
 
     quizzes_db = QuizzesDb(db_path=args.quizzes_db)
 
     question_set = {f'{i:02}' for i in range(1, args.questions + 1)}
-    question_set = question_set.union({f'{i:02}' for i in range(-args.warmup_questions, 0)})
+    question_set = question_set.union(
+        {f'{i:02}' for i in range(-args.warmup_questions, 0)})
 
     logger.info(f'Question set: {question_set}')
 
     quiz = TelegramQuiz(id=args.game_id, updater=updater, question_set=question_set,
                         quizzes_db=quizzes_db, handler_group=1, logger=logger)
 
+    updater.dispatcher.add_handler(telegram.ext.MessageHandler(
+        telegram.ext.Filters.text, quiz._handle_log_update))
+
+    updater.start_polling()
+
     server = QuizHttpServer(host='localhost', port=8000,
                             quiz=quiz, logger=logger)
-
     server.serve_forever()
-
     updater.stop()
 
 
