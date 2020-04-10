@@ -43,7 +43,7 @@ function updateAnswersTable(status) {
     for (const i in question_set) {
         let question_id = question_set[i];
         answers = team_ids.map(function (id) {
-            if (question_id in status.answers) {
+            if (question_id in status.answers && id in status.answers[question_id]) {
                 return status.answers[question_id][id]
             } else {
                 return ''
