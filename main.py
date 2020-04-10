@@ -10,12 +10,11 @@ import sys
 def _parse_args(args: List[str]):
     parser = argparse.ArgumentParser(
         description='Application for hosting a quiz.')
-    parser.add_argument('--log_file', default='quiz_telegram_bot.log')
-    parser.add_argument('--quizzes_db', default='quizzes.db')
-    parser.add_argument('--game_id', default='default')
+    parser.add_argument('--log-file', default='main.log')
+    parser.add_argument('--quizzes-db', default='quizzes.db')
+    parser.add_argument('--quiz-id', required=True)
     parser.add_argument('--telegram-bot-token', required=True)
-    parser.add_argument('--warmup_questions', default=2)
-    parser.add_argument('--questions', default=30)
+    parser.add_argument('--number-of-questions', default=30)
     return parser.parse_args()
 
 
@@ -39,14 +38,8 @@ def main(args: List[str]):
 
     quizzes_db = QuizzesDb(db_path=args.quizzes_db)
 
-    question_set = {f'{i:02}' for i in range(1, args.questions + 1)}
-    question_set = question_set.union(
-        {f'{i:02}' for i in range(-args.warmup_questions, 0)})
-
-    logger.info(f'Question set: {question_set}')
-
-    quiz = TelegramQuiz(id=args.game_id, bot_token=args.telegram_bot_token,
-                        question_set=question_set,
+    quiz = TelegramQuiz(id=args.quiz_id, bot_token=args.telegram_bot_token,
+                        number_of_questions=args.number_of_questions,
                         quizzes_db=quizzes_db, logger=logger)
 
     server = QuizHttpServer(host='localhost', port=8000,

@@ -30,7 +30,7 @@ class TestTelegramQuiz(unittest.TestCase):
         self.quizzes_db.insert_team(
             chat_id=5001, quiz_id='test', name='OldName', timestamp=100)
 
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'1'},
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1,
                             quizzes_db=self.quizzes_db, logger=self.logger)
 
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'OldName'}, quiz.teams)
@@ -62,7 +62,7 @@ class TestTelegramQuiz(unittest.TestCase):
                              self.quizzes_db.select_teams(quiz_id='test'))
 
     def test_start_stop_registration(self):
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1'},
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1,
                             quizzes_db=self.quizzes_db, logger=self.logger)
         self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
         quiz.start_registration()
@@ -78,7 +78,7 @@ class TestTelegramQuiz(unittest.TestCase):
 
         self.assertRaises(TelegramQuizError, quiz.stop_registration)
 
-        quiz.start_question(question_id='q1')
+        quiz.start_question(question_id='01')
         self.assertRaises(TelegramQuizError, quiz.start_registration)
 
     @patch('telegram.ext.CallbackContext')
@@ -89,13 +89,13 @@ class TestTelegramQuiz(unittest.TestCase):
             chat_id=5002, quiz_id='test', name='Tottenham', timestamp=1)
 
         self.quizzes_db.insert_answer(
-            chat_id=5001, quiz_id='test', question_id='q1', team_name='', answer='Apple', timestamp=1)
+            chat_id=5001, quiz_id='test', question_id='01', team_name='', answer='Apple', timestamp=1)
         self.quizzes_db.insert_answer(
-            chat_id=5002, quiz_id='test', question_id='q1', team_name='', answer='Orange', timestamp=2)
+            chat_id=5002, quiz_id='test', question_id='01', team_name='', answer='Orange', timestamp=2)
         self.quizzes_db.insert_answer(
-            chat_id=5001, quiz_id='test2', question_id='q1', team_name='', answer='Pear', timestamp=3)
+            chat_id=5001, quiz_id='test2', question_id='01', team_name='', answer='Pear', timestamp=3)
 
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1', 'q2'},
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=2,
                             quizzes_db=self.quizzes_db, logger=self.logger)
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
@@ -104,11 +104,11 @@ class TestTelegramQuiz(unittest.TestCase):
             chat=telegram.Chat(5001, 'private'), text='Banana'))
         update.message.reply_text = MagicMock()
 
-        quiz.start_question(question_id='q1')
+        quiz.start_question(question_id='01')
         quiz._handle_answer_update(update, context=None)
         quiz.stop_question()
 
-        expected_answers = {'q1': {5001: 'Banana', 5002: 'Orange'}}
+        expected_answers = {'01': {5001: 'Banana', 5002: 'Orange'}}
         self.assertDictEqual(expected_answers, quiz.answers)
         self.assertDictEqual(
             expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
@@ -120,11 +120,11 @@ class TestTelegramQuiz(unittest.TestCase):
             chat=telegram.Chat(13, 'private'), text='Non-registered'))
         update.message.reply_text = MagicMock()
 
-        quiz.start_question(question_id='q1')
+        quiz.start_question(question_id='01')
         quiz._handle_answer_update(update, context=None)
         quiz.stop_question()
 
-        expected_answers = {'q1': {5001: 'Banana', 5002: 'Orange'}}
+        expected_answers = {'01': {5001: 'Banana', 5002: 'Orange'}}
         self.assertDictEqual(expected_answers, quiz.answers)
         self.assertDictEqual(
             expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
@@ -136,28 +136,28 @@ class TestTelegramQuiz(unittest.TestCase):
             chat=telegram.Chat(5001, 'private'), text='London'))
         update.message.reply_text = MagicMock()
 
-        quiz.start_question(question_id='q2')
+        quiz.start_question(question_id='02')
         quiz._handle_answer_update(update, context=None)
         quiz.stop_question()
 
-        expected_answers = {'q1': {5001: 'Banana',
-                                   5002: 'Orange'}, 'q2': {5001: 'London'}}
+        expected_answers = {'01': {5001: 'Banana',
+                                   5002: 'Orange'}, '02': {5001: 'London'}}
         self.assertDictEqual(expected_answers, quiz.answers)
         self.assertDictEqual(
             expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
         update.message.reply_text.assert_called_once()
 
     def test_start_stop_question(self):
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1'},
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1,
                             quizzes_db=self.quizzes_db, logger=self.logger)
         self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
-        quiz.start_question(question_id='q1')
+        quiz.start_question(question_id='01')
         self.assertEqual(quiz._handle_answer_update,
                          quiz.updater.dispatcher.handlers[1][0].callback)
-        self.assertEqual('q1', quiz.question_id)
+        self.assertEqual('01', quiz.question_id)
 
         self.assertRaises(TelegramQuizError,
-                          quiz.start_question, question_id='q1')
+                          quiz.start_question, question_id='01')
 
         quiz.stop_question()
         self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
@@ -166,7 +166,7 @@ class TestTelegramQuiz(unittest.TestCase):
         self.assertRaises(TelegramQuizError, quiz.stop_question)
 
     def test_handle_log_update(self):
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1'},
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1,
                             quizzes_db=self.quizzes_db, logger=self.logger)
 
         self.quizzes_db.insert_message(

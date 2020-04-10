@@ -19,7 +19,7 @@ class TestQuizHttpServer(unittest.TestCase):
         self.logger.addHandler(logging.NullHandler())
         self.updater = telegram.ext.Updater(
             token='123:TOKEN', use_context=True)
-        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', question_set={'q1', 'q2'},
+        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=2,
                                  quizzes_db=self.quizzes_db, logger=self.logger)
         self.server = QuizHttpServer(
             host='localhost', port=0, quiz=self.quiz, logger=self.logger)
@@ -74,13 +74,13 @@ class TestQuizHttpServer(unittest.TestCase):
     def test_start_question(self):
         response = requests.post(self.url, json={
             'command': 'start_question',
-            'question_id': 'q1',
+            'question_id': '01',
         })
         self.assertEqual(200, response.status_code)
         self.assertDictEqual({
             'ok': True,
         }, response.json())
-        self.assertEqual('q1', self.quiz.question_id)
+        self.assertEqual('01', self.quiz.question_id)
 
     def test_start_wrong_question(self):
         response = requests.post(self.url, json={
@@ -94,7 +94,7 @@ class TestQuizHttpServer(unittest.TestCase):
         self.assertIsNone(self.quiz.question_id)
 
     def test_stop_question(self):
-        self.quiz.start_question('q1')
+        self.quiz.start_question('01')
         response = requests.post(self.url, json={
             'command': 'stop_question',
         })
@@ -105,18 +105,18 @@ class TestQuizHttpServer(unittest.TestCase):
         self.assertIsNone(self.quiz.question_id)
 
     def test_get_status(self):
-        self.quiz.question_id = 'q2'
+        self.quiz.question_id = '02'
         self.quiz.teams = {
             1: 'Barcelona',
             2: 'Real Madrid',
             3: 'Liverpool',
         }
         self.quiz.answers = {
-            'q1': {
+            '01': {
                 3: 'Apple',
                 4: 'Юнікод',
             },
-            'q2': {
+            '02': {
                 5: 'Mars',
                 6: 'Jupiter',
             }
@@ -129,15 +129,16 @@ class TestQuizHttpServer(unittest.TestCase):
             'ok': True,
             'quiz_id': 'test',
             'is_registration': False,
-            'question_id': 'q2',
-            'question_set': ['q1', 'q2'],
+            'question_id': '02',
+            'number_of_questions': 2,
+            'question_set': ['01', '02'],
             'teams': {'1': 'Barcelona', '2': 'Real Madrid', '3': 'Liverpool'},
             'answers': {
-                'q1': {
+                '01': {
                     '3': 'Apple',
                     '4': 'Юнікод',
                 },
-                'q2': {
+                '02': {
                     '5': 'Mars',
                     '6': 'Jupiter',
                 }

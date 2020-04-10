@@ -37,6 +37,7 @@ class QuizHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
                 'teams': server.quiz.teams,
                 'answers': server.quiz.answers,
                 'question_set': sorted(list(server.quiz.question_set)),
+                "number_of_questions": server.quiz.number_of_questions,
                 'question_id': server.quiz.question_id,
                 'is_registration': server.quiz.is_registration()
             }

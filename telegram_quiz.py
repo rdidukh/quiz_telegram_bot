@@ -12,18 +12,20 @@ class TelegramQuiz:
     def __init__(self, *, id: str,
                  bot_token: str,
                  quizzes_db: QuizzesDb,
-                 question_set: Set[str],
+                 number_of_questions: int,
                  logger: logging.Logger):
         self.id = id
         self.quizzes_db = quizzes_db
-        self.question_set = question_set
         self.logger = logger
         self.teams: Dict[int, str] = quizzes_db.select_teams(quiz_id=id)
-        self.answers: Dict[str, Dict[int, str]
+        self.answers: Dict[int, Dict[int, str]
                            ] = quizzes_db.select_all_answers(quiz_id=id)
         self.registration_handler: telegram.ext.MessageHandler = None
         self.question_handler: telegram.ext.MessageHandler = None
-        self.question_id = None
+        self.question_set: Set[str] = {f'{i:02}' for i in range(
+            1, number_of_questions + 1)}
+        self.number_of_questions = number_of_questions
+        self.question_id: str = None
         self.updater = telegram.ext.Updater(bot_token, use_context=True)
 
     def _handle_registration_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
