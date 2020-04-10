@@ -36,11 +36,12 @@ class TelegramQuiz:
         if context.chat_data.get('typing_name'):
             del context.chat_data['typing_name']
             name = update.message.text
+            timestamp = update.message.date.timestamp()
             self.logger.info(
                 f'Registration message. chat_id: {chat_id}, quiz_id: "{self.id}", name: "{name}"')
             message.reply_text(f'Your team "{name}" has been registered.')
             self.quizzes_db.insert_team(
-                chat_id=chat_id, quiz_id=self.id, name=name)
+                chat_id=chat_id, quiz_id=self.id, name=name, timestamp=timestamp)
             self.teams[chat_id] = update.message.text
         else:
             self.logger.info(
@@ -50,10 +51,16 @@ class TelegramQuiz:
                 'Registration for game is open. Send us your team name.')
 
     def start_registration(self):
+        if self.question_id:
+            self.logger.warning(f'Trying to start registration for quiz "{self.id}", '
+                                f'but question "{self.question_id}" is already started.')
+            raise TelegramQuizError(
+                f'Can not start registration of quiz "{self.id}" when question "{self.question_id}" is running.')
         if self.registration_handler:
             self.logger.warning(
-                f'Trying to start registration for game "{self.id}", but it is already running.')
-            return
+                f'Trying to start registration for game "{self.id}", but registration is already running.')
+            raise TelegramQuizError(
+                f'Can not start registration of quiz "{self.id}" because registration is already on.')
         self.registration_handler = telegram.ext.MessageHandler(
             telegram.ext.Filters.text, self._handle_registration_update)
         self.updater.dispatcher.add_handler(
@@ -63,8 +70,9 @@ class TelegramQuiz:
     def stop_registration(self):
         if not self.registration_handler:
             self.logger.warning(
-                f'Trying to top registration for game "{self.id}", but it was not running.')
-            return
+                f'Trying to stop registration for quiz "{self.id}", but registration was not running.')
+            raise TelegramQuizError(
+                f'Can not stop registration of quiz "{self.id}" because registration is not running.')
         self.updater.dispatcher.remove_handler(
             self.registration_handler, group=self.handler_group)
         self.registration_handler = None
@@ -76,14 +84,14 @@ class TelegramQuiz:
     def _handle_answer_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
         chat_id = update.message.chat_id
         answer = update.message.text
-        team_name = self.teams.get(chat_id) or ''
-        if not team_name:
-            self.logger.warning(f'Empty team name. chat_id: {chat_id}, answer: {answer}, '
-                                f'quiz_id: {self.id}, question_id: {self.question_id}.')
+        timestamp = update.message.date.timestamp()
+        team_name = self.teams.get(chat_id)
+        if team_name is None:
+            return
         self.logger.info(f'Answer received. '
                          f'question_id: {self.question_id}, quiz_id: {self.id}, chat_id: {chat_id}, '
                          f'team: "{team_name}", answer: "{answer}"')
-        self.quizzes_db.insert_answer(chat_id=chat_id, quiz_id=self.id,
+        self.quizzes_db.insert_answer(chat_id=chat_id, quiz_id=self.id, timestamp=timestamp,
                                       question_id=self.question_id, team_name=team_name, answer=answer)
         update.message.reply_text(f'You answer received: "{answer}".')
         if self.question_id not in self.answers:
@@ -131,7 +139,8 @@ class TelegramQuiz:
         update_id = update.update_id or 0
         message: telegram.message.Message = update.message
         if not message:
-            self.logger.warning(f'Telegram update with no message. update_id: {update_id}.')
+            self.logger.warning(
+                f'Telegram update with no message. update_id: {update_id}.')
             return
         timestamp = int(message.date.timestamp()) if message.date else 0
         chat_id = message.chat_id or 0

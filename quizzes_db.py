@@ -19,8 +19,7 @@ class QuizzesDb:
         self.db_path = db_path
         self.create_if_not_exists()
 
-    def insert_team(self, *, chat_id: int, quiz_id: str, name: str, timestamp=None):
-        timestamp = timestamp or int(datetime.utcnow().timestamp())
+    def insert_team(self, *, chat_id: int, quiz_id: str, name: str, timestamp: int):
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 db.execute('''INSERT INTO teams
@@ -33,8 +32,7 @@ class QuizzesDb:
                       question_id: str,
                       team_name: str,
                       answer: str,
-                      timestamp: int = None):
-        timestamp = timestamp or int(datetime.utcnow().timestamp())
+                      timestamp: int):
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 db.execute('''INSERT INTO answers
