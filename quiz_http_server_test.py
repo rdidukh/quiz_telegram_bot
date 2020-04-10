@@ -3,6 +3,7 @@ import os
 from quizzes_db import QuizzesDb
 from quiz_http_server import QuizHttpServer
 from telegram_quiz import TelegramQuiz
+from telegram_quiz_test import STRINGS
 import tempfile
 import threading
 import requests
@@ -19,8 +20,12 @@ class TestQuizHttpServer(unittest.TestCase):
         self.logger.addHandler(logging.NullHandler())
         self.updater = telegram.ext.Updater(
             token='123:TOKEN', use_context=True)
+        self.strings_file = os.path.join(self.test_dir.name, 'strings.json')
+        with open(self.strings_file, 'w') as file:
+            file.write(STRINGS)
         self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=2,
-                                 quizzes_db=self.quizzes_db, logger=self.logger)
+                                 language='lang', strings_file=self.strings_file, quizzes_db=self.quizzes_db,
+                                 logger=self.logger)
         self.server = QuizHttpServer(
             host='localhost', port=0, quiz=self.quiz, logger=self.logger)
         self.url = f'http://localhost:{self.server.server_port}/'

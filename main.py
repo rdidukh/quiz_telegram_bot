@@ -15,6 +15,8 @@ def _parse_args(args: List[str]):
     parser.add_argument('--quiz-id', required=True)
     parser.add_argument('--telegram-bot-token', required=True)
     parser.add_argument('--number-of-questions', default=30)
+    parser.add_argument('--strings-file', default='strings.json')
+    parser.add_argument('--language', default='uk')
     return parser.parse_args()
 
 
@@ -40,10 +42,13 @@ def main(args: List[str]):
 
     quiz = TelegramQuiz(id=args.quiz_id, bot_token=args.telegram_bot_token,
                         number_of_questions=args.number_of_questions,
-                        quizzes_db=quizzes_db, logger=logger)
+                        quizzes_db=quizzes_db, strings_file=args.strings_file,
+                        language=args.language, logger=logger)
 
     server = QuizHttpServer(host='localhost', port=8000,
                             quiz=quiz, logger=logger)
+
+    quiz.start()
     server.serve_forever()
 
 

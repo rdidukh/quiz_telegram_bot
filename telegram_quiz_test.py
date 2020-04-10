@@ -5,9 +5,20 @@ from quizzes_db import Message, QuizzesDb
 import tempfile
 import telegram
 import telegram.ext
+import textwrap
 import unittest
 import os
 from unittest.mock import patch, MagicMock
+
+STRINGS = textwrap.dedent('''
+    {
+        "lang": {
+            "registration_invitation": "Hello!",
+            "registration_confirmation": "Good luck!",
+            "answer_confirmation": "Confirmed."
+        }
+    }
+''')
 
 
 class TestTelegramQuiz(unittest.TestCase):
@@ -15,6 +26,9 @@ class TestTelegramQuiz(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.test_dir.name, 'quizzes.db')
+        self.strings_file = os.path.join(self.test_dir.name, 'strings.json')
+        with open(self.strings_file, 'w') as file:
+            file.write(STRINGS)
         self.quizzes_db = QuizzesDb(db_path=self.db_path)
         self.logger = logging.Logger('test')
         self.logger.addHandler(logging.NullHandler())
@@ -30,8 +44,8 @@ class TestTelegramQuiz(unittest.TestCase):
         self.quizzes_db.insert_team(
             chat_id=5001, quiz_id='test', name='OldName', timestamp=100)
 
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1,
-                            quizzes_db=self.quizzes_db, logger=self.logger)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
+                            strings_file=self.strings_file, quizzes_db=self.quizzes_db, logger=self.logger)
 
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'OldName'}, quiz.teams)
 
@@ -46,6 +60,7 @@ class TestTelegramQuiz(unittest.TestCase):
         quiz._handle_registration_update(update, context)
 
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'OldName'}, quiz.teams)
+        update.message.reply_text.assert_called_with('Hello!')
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -60,10 +75,11 @@ class TestTelegramQuiz(unittest.TestCase):
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'NewName'}, quiz.teams)
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'NewName'},
                              self.quizzes_db.select_teams(quiz_id='test'))
+        update.message.reply_text.assert_called_with('Good luck!')
 
     def test_start_stop_registration(self):
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1,
-                            quizzes_db=self.quizzes_db, logger=self.logger)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
+                            strings_file=self.strings_file, quizzes_db=self.quizzes_db, logger=self.logger)
         self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
         quiz.start_registration()
         self.assertEqual(quiz._handle_registration_update,
@@ -95,8 +111,8 @@ class TestTelegramQuiz(unittest.TestCase):
         self.quizzes_db.insert_answer(
             chat_id=5001, quiz_id='test2', question_id='01', team_name='', answer='Pear', timestamp=3)
 
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=2,
-                            quizzes_db=self.quizzes_db, logger=self.logger)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=2, language='lang',
+                            strings_file=self.strings_file, quizzes_db=self.quizzes_db, logger=self.logger)
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -112,7 +128,7 @@ class TestTelegramQuiz(unittest.TestCase):
         self.assertDictEqual(expected_answers, quiz.answers)
         self.assertDictEqual(
             expected_answers, self.quizzes_db.select_all_answers(quiz_id='test'))
-        update.message.reply_text.assert_called_once()
+        update.message.reply_text.assert_called_with('Confirmed.')
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -148,8 +164,8 @@ class TestTelegramQuiz(unittest.TestCase):
         update.message.reply_text.assert_called_once()
 
     def test_start_stop_question(self):
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1,
-                            quizzes_db=self.quizzes_db, logger=self.logger)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
+                            strings_file=self.strings_file, quizzes_db=self.quizzes_db, logger=self.logger)
         self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
         quiz.start_question(question_id='01')
         self.assertEqual(quiz._handle_answer_update,
@@ -166,8 +182,8 @@ class TestTelegramQuiz(unittest.TestCase):
         self.assertRaises(TelegramQuizError, quiz.stop_question)
 
     def test_handle_log_update(self):
-        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1,
-                            quizzes_db=self.quizzes_db, logger=self.logger)
+        quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
+                            strings_file=self.strings_file, quizzes_db=self.quizzes_db, logger=self.logger)
 
         self.quizzes_db.insert_message(
             Message(timestamp=1, update_id=2, chat_id=3, text='existing'))

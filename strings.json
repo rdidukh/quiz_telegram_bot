@@ -1,0 +1,12 @@
+{
+    "en": {
+        "registration_invitation": "Registration for the game is open. Send us your team name.",
+        "registration_confirmation": "Your team \"{team}\" has been registered. Good luck!",
+        "answer_confirmation": "Your answer has been submitted: \"{answer}\"."
+    },
+    "uk": {
+        "registration_invitation": "Триває реєстрація на гру. Надішліть нам назву вашої команди.",
+        "registration_confirmation": "Вашу команду \"{team}\" зареєстровано. Вдалої гри!",
+        "answer_confirmation": "Вашу відповідь прийнято: \"{answer}\"."
+    }
+}

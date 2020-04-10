@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+import json
 import logging
 from quizzes_db import Message, QuizzesDb
 import telegram.ext
@@ -8,11 +10,20 @@ class TelegramQuizError(Exception):
     pass
 
 
+@dataclass
+class Strings:
+    registration_invitation: str = ''
+    registration_confirmation: str = ''
+    answer_confirmation: str = ''
+
+
 class TelegramQuiz:
     def __init__(self, *, id: str,
                  bot_token: str,
                  quizzes_db: QuizzesDb,
                  number_of_questions: int,
+                 strings_file: str,
+                 language: str,
                  logger: logging.Logger):
         self.id = id
         self.quizzes_db = quizzes_db
@@ -27,6 +38,31 @@ class TelegramQuiz:
         self.number_of_questions = number_of_questions
         self.question_id: str = None
         self.updater = telegram.ext.Updater(bot_token, use_context=True)
+        self.language = language
+        self.strings: Strings = self._get_strings(strings_file, language)
+
+    def _get_strings(self, strings_file: str, language: str) -> Strings:
+        try:
+            with open(strings_file) as file:
+                content = file.read()
+        except Exception as e:
+            raise TelegramQuizError(f'Could not read file {strings_file}: {e}')
+
+        try:
+            obj = json.loads(content)
+        except json.JSONDecodeError as e:
+            raise TelegramQuizError(f'Could not parse file {strings_file}: {e}')
+
+        if language not in obj:
+            raise TelegramQuizError(f'Language {language} is not supported in file {strings_file}')
+
+        strings = Strings()
+        for string in ("registration_invitation", "registration_confirmation", "answer_confirmation"):
+            if string not in obj[language]:
+                raise TelegramQuizError(f'String {string} for language {language} not specified in file {strings_file}')
+            setattr(strings, string, obj[language][string])
+
+        return strings
 
     def _handle_registration_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
         chat_id = update.message.chat_id
@@ -39,7 +75,7 @@ class TelegramQuiz:
             timestamp = update.message.date.timestamp()
             self.logger.info(
                 f'Registration message. chat_id: {chat_id}, quiz_id: "{self.id}", name: "{name}"')
-            message.reply_text(f'Your team "{name}" has been registered.')
+            message.reply_text(self.strings.registration_confirmation.format(team=name))
             self.quizzes_db.insert_team(
                 chat_id=chat_id, quiz_id=self.id, name=name, timestamp=timestamp)
             self.teams[chat_id] = update.message.text
@@ -47,8 +83,7 @@ class TelegramQuiz:
             self.logger.info(
                 f'Requesting a team to send their name. chat_id: {chat_id}, quiz_id: "{self.id}"')
             context.chat_data['typing_name'] = True
-            message.reply_text(
-                'Registration for game is open. Send us your team name.')
+            message.reply_text(self.strings.registration_invitation)
 
     def start_registration(self):
         if self.question_id:
@@ -93,7 +128,7 @@ class TelegramQuiz:
                          f'team: "{team_name}", answer: "{answer}"')
         self.quizzes_db.insert_answer(chat_id=chat_id, quiz_id=self.id, timestamp=timestamp,
                                       question_id=self.question_id, team_name=team_name, answer=answer)
-        update.message.reply_text(f'You answer received: "{answer}".')
+        update.message.reply_text(self.strings.answer_confirmation.format(answer=answer))
         if self.question_id not in self.answers:
             self.answers[self.question_id] = {}
         self.answers[self.question_id][chat_id] = answer
