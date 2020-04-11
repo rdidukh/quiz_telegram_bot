@@ -1,3 +1,5 @@
+const enabledButtonColor = '#66ff66'
+
 function addTableRow(table, values) {
     var tr = document.createElement('tr')
     for (i in values) {
@@ -53,6 +55,10 @@ function updateAnswersTable(status) {
 
         startButton = document.createElement('button')
         startButton.innerHTML = 'Start'
+        if(!status.is_registration && !status.question_id) {
+            startButton.style.backgroundColor = enabledButtonColor
+        }
+        startButton.style.border = '1px solid black'
         startButton.onclick = function () {
             sendCommand({ "command": "start_question", "question_id": question_id }, function (response) {
                 console.log("Question '" + question_id + "' started!")
@@ -88,6 +94,25 @@ function getStatus() {
         updateStatusTable(response)
         updateTeamsTable(response)
         updateAnswersTable(response)
+
+        startRegistrationButton = document.getElementById("start_registration_button")
+        stopRegistrationButton = document.getElementById("stop_registration_button")
+        stopQuestionButton = document.getElementById("stop_question_button")
+
+        if (response.is_registration) {
+            startRegistrationButton.style.backgroundColor = null
+            stopRegistrationButton.style.backgroundColor = enabledButtonColor
+            stopQuestionButton.style.backgroundColor = null
+        } else if(response.question_id) {
+            startRegistrationButton.style.backgroundColor = null
+            stopRegistrationButton.style.backgroundColor = null
+            stopQuestionButton.style.backgroundColor = enabledButtonColor
+        } else {
+            startRegistrationButton.style.backgroundColor = enabledButtonColor
+            stopRegistrationButton.style.backgroundColor = null     
+            stopQuestionButton.style.backgroundColor = null       
+        }
+
     }, function (error) {
         console.log('Could not get status: ' + error)
     })
