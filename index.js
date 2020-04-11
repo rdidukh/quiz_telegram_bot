@@ -19,6 +19,7 @@ function updateStatusTable(status) {
     addTableRow(table, ["Quiz", status.quiz_id])
     addTableRow(table, ["Question", status.question_id])
     addTableRow(table, ["Registration", status.is_registration])
+    addTableRow(table, ["Language", status.language])
     addTableRow(table, ["Last updated", new Date()])
 }
 

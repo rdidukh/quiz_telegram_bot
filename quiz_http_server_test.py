@@ -136,6 +136,7 @@ class TestQuizHttpServer(unittest.TestCase):
             'is_registration': False,
             'question_id': '02',
             'number_of_questions': 2,
+            'language': 'lang',
             'question_set': ['01', '02'],
             'teams': {'1': 'Barcelona', '2': 'Real Madrid', '3': 'Liverpool'},
             'answers': {

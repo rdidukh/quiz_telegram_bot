@@ -38,6 +38,7 @@ class QuizHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
                 'answers': server.quiz.answers,
                 'question_set': sorted(list(server.quiz.question_set)),
                 "number_of_questions": server.quiz.number_of_questions,
+                "language": server.quiz.language,
                 'question_id': server.quiz.question_id,
                 'is_registration': server.quiz.is_registration()
             }
