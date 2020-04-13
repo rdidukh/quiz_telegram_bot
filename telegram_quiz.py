@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 import logging
-from quizzes_db import Message, QuizzesDb
+from quizzes_db import Answer, Message, QuizzesDb
 import telegram.ext
 from typing import Dict, Set
 
@@ -29,8 +29,6 @@ class TelegramQuiz:
         self.quizzes_db = quizzes_db
         self.logger = logger
         self.teams: Dict[int, str] = quizzes_db.select_teams(quiz_id=id)
-        self.answers: Dict[int, Dict[int, str]
-                           ] = quizzes_db.select_all_answers(quiz_id=id)
         self.registration_handler: telegram.ext.MessageHandler = None
         self.question_handler: telegram.ext.MessageHandler = None
         self.question_set: Set[str] = {f'{i:02}' for i in range(
@@ -40,6 +38,7 @@ class TelegramQuiz:
         self.updater = telegram.ext.Updater(bot_token, use_context=True)
         self.language = language
         self.strings: Strings = self._get_strings(strings_file, language)
+        self._answers_for_testing = None
 
     def _get_strings(self, strings_file: str, language: str) -> Strings:
         try:
@@ -63,6 +62,26 @@ class TelegramQuiz:
             setattr(strings, string, obj[language][string])
 
         return strings
+
+    # DEPRECATED: Left for backward compatibility only.
+    @property
+    def answers(self) -> Dict[str, Dict[int, str]]:
+        # This is a hack, but the method is going to be removed soon anyway.
+        if self._answers_for_testing:
+            return self._answers_for_testing
+        result: Dict[str, Dict[int, str]] = {}
+        answers = self.quizzes_db.get_answers_for_quiz(quiz_id=self.id)
+        for answer in answers:
+            question = f'{answer.question:02}'
+            if question not in result:
+                result[question] = {}
+            result[question][answer.team_id] = answer.answer
+        return result
+
+    # DEPRECATED: Left for testing only.
+    @answers.setter
+    def answers(self, value):
+        self._answers_for_testing = value
 
     def _handle_registration_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
         chat_id = update.message.chat_id
@@ -126,12 +145,16 @@ class TelegramQuiz:
         self.logger.info(f'Answer received. '
                          f'question_id: {self.question_id}, quiz_id: {self.id}, chat_id: {chat_id}, '
                          f'team: "{team_name}", answer: "{answer}"')
-        self.quizzes_db.insert_answer(chat_id=chat_id, quiz_id=self.id, timestamp=timestamp,
-                                      question_id=self.question_id, team_name=team_name, answer=answer)
+
+        self.quizzes_db.insert_answer(Answer(
+            quiz_id=self.id,
+            question=int(self.question_id),
+            team_id=chat_id,
+            answer=answer,
+            timestamp=timestamp,
+        ))
+
         update.message.reply_text(self.strings.answer_confirmation.format(answer=answer))
-        if self.question_id not in self.answers:
-            self.answers[self.question_id] = {}
-        self.answers[self.question_id][chat_id] = answer
 
     def start_question(self, question_id: str):
         if self.registration_handler:
