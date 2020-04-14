@@ -1,8 +1,9 @@
 import argparse
 import logging
-from quiz_http_server import QuizHttpServer
+import quiz_http_server
 from quizzes_db import QuizzesDb
 from telegram_quiz import TelegramQuiz
+import tornado
 from typing import List
 import sys
 
@@ -44,12 +45,11 @@ def main(args: List[str]):
                         number_of_questions=args.number_of_questions,
                         quizzes_db=quizzes_db, strings_file=args.strings_file,
                         language=args.language, logger=logger)
-
-    server = QuizHttpServer(host='localhost', port=8000,
-                            quiz=quiz, logger=logger)
-
     quiz.start()
-    server.serve_forever()
+
+    app = quiz_http_server.create_quiz_tornado_app(quiz=quiz)
+    app.listen(8000)
+    tornado.ioloop.IOLoop.current().start()
 
 
 if __name__ == "__main__":
