@@ -1,7 +1,7 @@
 import argparse
 import logging
 import quiz_http_server
-from quizzes_db import QuizzesDb
+from quiz_db import QuizDb
 from telegram_quiz import TelegramQuiz
 import tornado
 from typing import List
@@ -12,7 +12,7 @@ def _parse_args(args: List[str]):
     parser = argparse.ArgumentParser(
         description='Application for hosting a quiz.')
     parser.add_argument('--log-file', default='main.log')
-    parser.add_argument('--quizzes-db', default='quizzes.db')
+    parser.add_argument('--quiz-db', default='quiz.db')
     parser.add_argument('--quiz-id', required=True)
     parser.add_argument('--telegram-bot-token', required=True)
     parser.add_argument('--number-of-questions', default=30)
@@ -39,11 +39,11 @@ def main(args: List[str]):
     logger.info('')
     logger.info('Hello!')
 
-    quizzes_db = QuizzesDb(db_path=args.quizzes_db)
+    quiz_db = QuizDb(db_path=args.quiz_db)
 
     quiz = TelegramQuiz(id=args.quiz_id, bot_token=args.telegram_bot_token,
                         number_of_questions=args.number_of_questions,
-                        quizzes_db=quizzes_db, strings_file=args.strings_file,
+                        quiz_db=quiz_db, strings_file=args.strings_file,
                         language=args.language, logger=logger)
     quiz.start()
 

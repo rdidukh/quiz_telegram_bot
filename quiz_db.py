@@ -26,7 +26,7 @@ class Answer:
     id: int = field(default=None, compare=False)
 
 
-class QuizzesDb:
+class QuizDb:
     def __init__(self, *, db_path: str):
         self.db_path = db_path
         self.create_if_not_exists()

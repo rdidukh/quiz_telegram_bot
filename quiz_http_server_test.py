@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from quizzes_db import QuizzesDb
+from quiz_db import QuizDb
 from quiz_http_server import create_quiz_tornado_app
 from telegram_quiz import TelegramQuiz
 from telegram_quiz_test import STRINGS
@@ -14,8 +14,8 @@ import unittest
 class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
     def get_app(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.db_path = os.path.join(self.test_dir.name, 'quizzes.db')
-        self.quizzes_db = QuizzesDb(db_path=self.db_path)
+        self.db_path = os.path.join(self.test_dir.name, 'quiz.db')
+        self.quiz_db = QuizDb(db_path=self.db_path)
         self.logger = logging.Logger('test')
         self.logger.addHandler(logging.NullHandler())
         self.updater = telegram.ext.Updater(
@@ -24,7 +24,7 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
         with open(self.strings_file, 'w') as file:
             file.write(STRINGS)
         self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=2,
-                                 language='lang', strings_file=self.strings_file, quizzes_db=self.quizzes_db,
+                                 language='lang', strings_file=self.strings_file, quiz_db=self.quiz_db,
                                  logger=self.logger)
         return create_quiz_tornado_app(quiz=self.quiz)
 

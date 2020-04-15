@@ -1,4 +1,4 @@
-from quizzes_db import Answer, Message, QuizzesDb
+from quiz_db import Answer, Message, QuizDb
 import tempfile
 from typing import Any, Dict, List
 import unittest
@@ -23,12 +23,12 @@ def _insert_into_answers(db_path, values: List[Dict[str, Any]]):
                            'VALUES (:quiz_id, :question, :team_id, :answer, :timestamp, :checked, :points)', values)
 
 
-class TestQuizzesDb(unittest.TestCase):
+class TestQuizDb(unittest.TestCase):
 
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.test_dir.name, 'messages.db')
-        self.quizzes_db = QuizzesDb(db_path=self.db_path)
+        self.quiz_db = QuizDb(db_path=self.db_path)
 
     def tearDown(self):
         self.test_dir.cleanup()
@@ -36,7 +36,7 @@ class TestQuizzesDb(unittest.TestCase):
     def test_insert_message(self):
         message = Message(timestamp=1234567, update_id=1001,
                           chat_id=2001, text='Apple', insert_timestamp=123)
-        self.quizzes_db.insert_message(message)
+        self.quiz_db.insert_message(message)
 
         self.assertListEqual([
             (123, 1234567, 1001, 2001, 'Apple')
@@ -44,7 +44,7 @@ class TestQuizzesDb(unittest.TestCase):
 
         message = Message(timestamp=1234568, update_id=1002,
                           chat_id=2002, text='Unicode Юнікод 😎', insert_timestamp=124)
-        self.quizzes_db.insert_message(message)
+        self.quiz_db.insert_message(message)
 
         self.assertListEqual([
             (123, 1234567, 1001, 2001, 'Apple'),
@@ -54,7 +54,7 @@ class TestQuizzesDb(unittest.TestCase):
     def test_insert_answer(self):
         answer = Answer(quiz_id='test', question=3, team_id=5001,
                         answer='Unicode Юнікод 😎', timestamp=123, checked=True, points=7)
-        self.quizzes_db.insert_answer(answer)
+        self.quiz_db.insert_answer(answer)
 
         self.assertListEqual([
             ('test', 3, 5001, 'Unicode Юнікод 😎', 123, True, 7),
@@ -62,7 +62,7 @@ class TestQuizzesDb(unittest.TestCase):
 
         answer = Answer(quiz_id='other', question=12, team_id=5002,
                         answer='Apple', timestamp=321, id=7654)
-        self.quizzes_db.insert_answer(answer)
+        self.quiz_db.insert_answer(answer)
 
         self.assertListEqual([
             ('test', 3, 5001, 'Unicode Юнікод 😎', 123, True, 7),
@@ -83,7 +83,7 @@ class TestQuizzesDb(unittest.TestCase):
             'quiz_id': 'test', 'question': 9, 'team_id': 5002,
             'answer': 'Unicode Юнікод 😎', 'timestamp': 34, 'checked': False, 'points': 0,
         }])
-        answers = self.quizzes_db.get_answers_for_quiz('test')
+        answers = self.quiz_db.get_answers_for_quiz('test')
 
         self.assertListEqual(sorted([
             Answer(quiz_id='test', question=9, team_id=5002,

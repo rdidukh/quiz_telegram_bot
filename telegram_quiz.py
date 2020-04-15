@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 import logging
-from quizzes_db import Answer, Message, QuizzesDb
+from quiz_db import Answer, Message, QuizDb
 import telegram.ext
 import telegram.update
 from typing import Dict, Set
@@ -21,15 +21,15 @@ class Strings:
 class TelegramQuiz:
     def __init__(self, *, id: str,
                  bot_token: str,
-                 quizzes_db: QuizzesDb,
+                 quiz_db: QuizDb,
                  number_of_questions: int,
                  strings_file: str,
                  language: str,
                  logger: logging.Logger):
         self.id = id
-        self.quizzes_db = quizzes_db
+        self.quiz_db = quiz_db
         self.logger = logger
-        self.teams: Dict[int, str] = quizzes_db.select_teams(quiz_id=id)
+        self.teams: Dict[int, str] = quiz_db.select_teams(quiz_id=id)
         self.registration_handler: telegram.ext.MessageHandler = None
         self.question_handler: telegram.ext.MessageHandler = None
         self.question_set: Set[str] = {f'{i:02}' for i in range(
@@ -71,7 +71,7 @@ class TelegramQuiz:
         if self._answers_for_testing:
             return self._answers_for_testing
         result: Dict[str, Dict[int, str]] = {}
-        answers = self.quizzes_db.get_answers_for_quiz(quiz_id=self.id)
+        answers = self.quiz_db.get_answers_for_quiz(quiz_id=self.id)
         for answer in answers:
             question = f'{answer.question:02}'
             if question not in result:
@@ -96,7 +96,7 @@ class TelegramQuiz:
             self.logger.info(
                 f'Registration message. chat_id: {chat_id}, quiz_id: "{self.id}", name: "{name}"')
             message.reply_text(self.strings.registration_confirmation.format(team=name))
-            self.quizzes_db.insert_team(
+            self.quiz_db.insert_team(
                 chat_id=chat_id, quiz_id=self.id, name=name, timestamp=timestamp)
             self.teams[chat_id] = update.message.text
         else:
@@ -147,7 +147,7 @@ class TelegramQuiz:
                          f'question_id: {self.question_id}, quiz_id: {self.id}, chat_id: {chat_id}, '
                          f'team: "{team_name}", answer: "{answer}"')
 
-        self.quizzes_db.insert_answer(Answer(
+        self.quiz_db.insert_answer(Answer(
             quiz_id=self.id,
             question=int(self.question_id),
             team_id=chat_id,
@@ -208,7 +208,7 @@ class TelegramQuiz:
         self.logger.info(
             f'message: timestamp:{timestamp}, chat_id:{chat_id}, text: "{text}"')
         self.logger.info('Committing values to database...')
-        self.quizzes_db.insert_message(Message(
+        self.quiz_db.insert_message(Message(
             timestamp=timestamp, update_id=update_id, chat_id=chat_id, text=text))
         self.logger.info('Committing values to database done.')
 
