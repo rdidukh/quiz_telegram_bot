@@ -21,30 +21,21 @@ def _parse_args(args: List[str]):
     return parser.parse_args()
 
 
-def _create_logger(*, name: str, log_file: str):
-    logger = logging.getLogger(name)
-    logger_handler = logging.FileHandler(log_file)
-    logger_formatter = logging.Formatter(
-        '%(asctime)s: %(process)s: %(levelname)s: %(filename)s:%(lineno)d - %(message)s')
-    logger_handler.setFormatter(logger_formatter)
-    logger.addHandler(logger_handler)
-    logger.setLevel(logging.INFO)
-    return logger
-
-
 def main(args: List[str]):
     args = _parse_args(args)
 
-    logger = _create_logger(name='quiz_telegram_bot', log_file=args.log_file)
-    logger.info('')
-    logger.info('Hello!')
+    log_format = '%(asctime)s: %(process)s: %(levelname)s: %(filename)s:%(lineno)d - %(message)s'
+    logging.basicConfig(filename=args.log_file, format=log_format, level=logging.INFO)
+
+    logging.info('')
+    logging.info('Hello!')
 
     quiz_db = QuizDb(db_path=args.quiz_db)
 
     quiz = TelegramQuiz(id=args.quiz_id, bot_token=args.telegram_bot_token,
                         number_of_questions=args.number_of_questions,
                         quiz_db=quiz_db, strings_file=args.strings_file,
-                        language=args.language, logger=logger)
+                        language=args.language)
     quiz.start()
 
     app = quiz_http_server.create_quiz_tornado_app(quiz=quiz)

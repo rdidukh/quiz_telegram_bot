@@ -1,5 +1,4 @@
 from datetime import datetime
-import logging
 from telegram_quiz import TelegramQuiz, TelegramQuizError
 from quiz_db import Answer, Message, QuizDb
 import tempfile
@@ -30,8 +29,6 @@ class TestTelegramQuiz(unittest.TestCase):
         with open(self.strings_file, 'w') as file:
             file.write(STRINGS)
         self.quiz_db = QuizDb(db_path=self.db_path)
-        self.logger = logging.Logger('test')
-        self.logger.addHandler(logging.NullHandler())
 
     def tearDown(self):
         self.test_dir.cleanup()
@@ -48,7 +45,7 @@ class TestTelegramQuiz(unittest.TestCase):
             chat_id=5001, quiz_id='test', name='OldName', timestamp=100)
 
         quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
-                            strings_file=self.strings_file, quiz_db=self.quiz_db, logger=self.logger)
+                            strings_file=self.strings_file, quiz_db=self.quiz_db)
 
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'OldName'}, quiz.teams)
 
@@ -82,7 +79,7 @@ class TestTelegramQuiz(unittest.TestCase):
 
     def test_start_stop_registration(self):
         quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
-                            strings_file=self.strings_file, quiz_db=self.quiz_db, logger=self.logger)
+                            strings_file=self.strings_file, quiz_db=self.quiz_db)
         self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
         quiz.start_registration()
         self.assertEqual(quiz._handle_registration_update,
@@ -115,7 +112,7 @@ class TestTelegramQuiz(unittest.TestCase):
             Answer(quiz_id='test2', question=1, team_id=5001, answer='Pear', timestamp=3))
 
         quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=2, language='lang',
-                            strings_file=self.strings_file, quiz_db=self.quiz_db, logger=self.logger)
+                            strings_file=self.strings_file, quiz_db=self.quiz_db)
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -191,7 +188,7 @@ class TestTelegramQuiz(unittest.TestCase):
 
     def test_start_stop_question(self):
         quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
-                            strings_file=self.strings_file, quiz_db=self.quiz_db, logger=self.logger)
+                            strings_file=self.strings_file, quiz_db=self.quiz_db)
         self.assertDictEqual({}, quiz.updater.dispatcher.handlers)
         quiz.start_question(question_id='01')
         self.assertEqual(quiz._handle_answer_update,
@@ -209,7 +206,7 @@ class TestTelegramQuiz(unittest.TestCase):
 
     def test_handle_log_update(self):
         quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
-                            strings_file=self.strings_file, quiz_db=self.quiz_db, logger=self.logger)
+                            strings_file=self.strings_file, quiz_db=self.quiz_db)
 
         self.quiz_db.insert_message(
             Message(timestamp=1, update_id=2, chat_id=3, text='existing'))
