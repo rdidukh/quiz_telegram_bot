@@ -55,42 +55,47 @@ function updateAnswersTable(status) {
 
         startButton = document.createElement('button')
         startButton.innerHTML = 'Start'
-        if(!status.is_registration && !status.question_id) {
+        if (!status.is_registration && !status.question_id) {
             startButton.style.backgroundColor = enabledButtonColor
         }
         startButton.style.border = '1px solid black'
-        startButton.onclick = function () {
-            sendCommand({ "command": "start_question", "question_id": question_id }, function (response) {
+        startButton.onclick = () => {
+            sendCommand("startQuestion", { "question_id": question_id }).then((response) => {
                 console.log("Question '" + question_id + "' started!")
-            }, function (error) {
-                console.log("Could not start question: " + error)
-            })
+            }).catch((error) => {
+                console.warn("Could not start question: " + error)
+            });
         }
 
         addTableRow(table, [startButton, question_id].concat(answers))
     }
 }
 
-function sendCommand(command, callback, error_callback) {
-    var xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function () {
-        if (this.readyState == 4) {
-            var response = JSON.parse(this.responseText);
-            if (this.status != 200) {
-                console.warn('Status code: ' + this.status)
-                error_callback(response.error)
-            } else {
-                callback(response);
-            }
-        }
+async function sendCommand(command, args) {
+    const response = await fetch("/api/" + command, {
+        method: "POST",
+        body: JSON.stringify(args),
+        headers: { "Content-Type": "application/json" },
+    })
+
+    text = await response.text()
+
+    try {
+        data = JSON.parse(text)
+    } catch(e) {
+        console.error('Response is not a valid JSON object.')
+        console.log(text)
+        throw 'Response is not a valid JSON object.'
     }
-    xhttp.open("POST", "/", true);
-    xhttp.setRequestHeader("Content-type", "application/json");
-    xhttp.send(JSON.stringify(command));
+
+    if (response.status !== 200) {
+        throw data.error;
+    }
+    return data;
 }
 
 function getStatus() {
-    sendCommand({ "command": "get_status" }, function (response) {
+    sendCommand('getStatus', {}).then((response) => {
         updateStatusTable(response)
         updateTeamsTable(response)
         updateAnswersTable(response)
@@ -103,43 +108,42 @@ function getStatus() {
             startRegistrationButton.style.backgroundColor = null
             stopRegistrationButton.style.backgroundColor = enabledButtonColor
             stopQuestionButton.style.backgroundColor = null
-        } else if(response.question_id) {
+        } else if (response.question_id) {
             startRegistrationButton.style.backgroundColor = null
             stopRegistrationButton.style.backgroundColor = null
             stopQuestionButton.style.backgroundColor = enabledButtonColor
         } else {
             startRegistrationButton.style.backgroundColor = enabledButtonColor
-            stopRegistrationButton.style.backgroundColor = null     
-            stopQuestionButton.style.backgroundColor = null       
+            stopRegistrationButton.style.backgroundColor = null
+            stopQuestionButton.style.backgroundColor = null
         }
-
-    }, function (error) {
-        console.log('Could not get status: ' + error)
-    })
+    }).catch((error) => {
+        console.log("Could not get status: " + error)
+    });
 }
 
 function startRegistration() {
-    sendCommand({ "command": "start_registration" }, function (response) {
-        console.log('Registration started!')
-    }, function (error) {
-        console.warn('Could not start registration: ' + error)
-    })
+    sendCommand("startRegistration", {}).then((response) => {
+        console.log("Registration started!")
+    }).catch((error) => {
+        console.warn("Could not start registration: " + error)
+    });
 }
 
 function stopRegistration() {
-    sendCommand({ "command": "stop_registration" }, function (response) {
+    sendCommand("stopRegistration", {}).then((response) => {
         console.log('Registration stopped!')
-    }, function (error) {
+    }).catch((error) => {
         console.warn('Could not stop registration: ' + error)
-    })
+    });
 }
 
 function stopQuestion() {
-    sendCommand({ "command": "stop_question" }, function (response) {
-        console.log('Question stopped!')
-    }, function (error) {
-        console.warn('Could not stop question: ' + error)
-    })
+    sendCommand("stopQuestion", {}).then((response) => {
+        console.log("Question stopped!")
+    }).catch((error) => {
+        console.warn("Could not stop question: " + error)
+    });
 }
 
 function onLoad() {

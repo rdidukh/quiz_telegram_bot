@@ -41,76 +41,60 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(200, response.code)
 
     def test_invalid_json(self):
-        response = self.fetch('/', method='POST', body='#$%')
+        response = self.fetch('/api/getStatus', method='POST', body='#$%')
         self.assertEqual(400, response.code)
         self.assertDictEqual({
-            'ok': False,
             'error': 'Request is not a valid JSON object.'
         }, json.loads(response.body))
 
     def test_internal_error(self):
         self.quiz.start_registration = None
-        request = {'command': 'start_registration'}
-        response = self.fetch('/', method='POST', body=json.dumps(request))
+        response = self.fetch('/api/startRegistration', method='POST', body='')
         self.assertEqual(501, response.code)
         self.assertDictEqual({
-            'ok': False,
             'error': 'Internal server error'
         }, json.loads(response.body))
 
     def test_start_registration(self):
-        request = {'command': 'start_registration'}
-        response = self.fetch('/', method='POST', body=json.dumps(request))
+        response = self.fetch('/api/startRegistration', method='POST', body='')
         self.assertEqual(200, response.code)
-        self.assertDictEqual({
-            'ok': True,
-        }, json.loads(response.body))
+        self.assertDictEqual({}, json.loads(response.body))
+        self.assertTrue(self.quiz.is_registration())
+
+        response = self.fetch('/api/startRegistration', method='POST', body='')
+        self.assertEqual(400, response.code)
+        self.assertIn('error', json.loads(response.body))
         self.assertTrue(self.quiz.is_registration())
 
     def test_stop_registration(self):
         self.quiz.start_registration()
-        request = {'command': 'stop_registration'}
-        response = self.fetch('/', method='POST', body=json.dumps(request))
+        response = self.fetch('/api/stopRegistration', method='POST', body='')
         self.assertEqual(200, response.code)
-        self.assertDictEqual({
-            'ok': True,
-        }, json.loads(response.body))
+        self.assertDictEqual({}, json.loads(response.body))
         self.assertFalse(self.quiz.is_registration())
 
     def test_start_question(self):
-        request = {
-            'command': 'start_question',
-            'question_id': '01',
-        }
-        response = self.fetch('/', method='POST', body=json.dumps(request))
+        request = {'question_id': '01'}
+        response = self.fetch('/api/startQuestion',
+                              method='POST', body=json.dumps(request))
         self.assertEqual(200, response.code)
-        self.assertDictEqual({
-            'ok': True,
-        }, json.loads(response.body))
+        self.assertDictEqual({}, json.loads(response.body))
         self.assertEqual('01', self.quiz.question_id)
 
     def test_start_wrong_question(self):
-        request = {
-            'command': 'start_question',
-            'question_id': 'unexisting',
-        }
-        response = self.fetch('/', method='POST', body=json.dumps(request))
+        request = {'question_id': 'unexisting'}
+        response = self.fetch('/api/startQuestion',
+                              method='POST', body=json.dumps(request))
         self.assertEqual(400, response.code)
-        self.assertDictContainsSubset({
-            'ok': False,
-        }, json.loads(response.body))
+        self.assertListEqual(['error'],
+                             list(json.loads(response.body).keys()))
         self.assertIsNone(self.quiz.question_id)
 
     def test_stop_question(self):
         self.quiz.start_question('01')
-        request = {
-            'command': 'stop_question',
-        }
-        response = self.fetch('/', method='POST', body=json.dumps(request))
+        response = self.fetch('/api/stopQuestion', method='POST', body='')
         self.assertEqual(200, response.code)
-        self.assertDictEqual({
-            'ok': True,
-        }, json.loads(response.body))
+        self.assertDictEqual({}, json.loads(response.body))
         self.assertIsNone(self.quiz.question_id)
 
     def test_get_status(self):
@@ -130,13 +114,9 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
                 6: 'Jupiter',
             }
         }
-        request = {
-            'command': 'get_status',
-        }
-        response = self.fetch('/', method='POST', body=json.dumps(request))
+        response = self.fetch('/api/getStatus', method='POST', body='')
         self.assertEqual(200, response.code)
         self.assertDictEqual({
-            'ok': True,
             'quiz_id': 'test',
             'is_registration': False,
             'question_id': '02',
