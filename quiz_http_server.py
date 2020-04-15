@@ -1,4 +1,5 @@
 import json
+import logging
 from telegram_quiz import TelegramQuiz, TelegramQuizError
 import tornado.httpserver
 import tornado.ioloop
@@ -33,6 +34,7 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
             response = {'ok': False, 'error': str(e)}
             status_code = 400
         except Exception:
+            logging.exception('Internal server error')
             response = {'ok': False, 'error': 'Internal server error'}
             status_code = 501
 

@@ -2,7 +2,7 @@ import contextlib
 from datetime import datetime
 from dataclasses import dataclass, field
 import sqlite3
-from typing import Dict, List
+from typing import List, Optional
 
 
 @dataclass
@@ -26,17 +26,18 @@ class Answer:
     id: int = field(default=None, compare=False)
 
 
+@dataclass(order=True)
+class Team:
+    quiz_id: str
+    id: int
+    name: str
+    timestamp: int
+
+
 class QuizDb:
     def __init__(self, *, db_path: str):
         self.db_path = db_path
         self.create_if_not_exists()
-
-    def insert_team(self, *, chat_id: int, quiz_id: str, name: str, timestamp: int):
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
-            with db:
-                db.execute('''INSERT INTO teams
-                     (timestamp, chat_id, quiz_id, name)
-                     VALUES (?, ?, ?, ?)''', (timestamp, chat_id, quiz_id, name))
 
     def get_answers_for_quiz(self, quiz_id: str) -> List[Answer]:
         answers: List[Answer] = []
@@ -75,16 +76,6 @@ class QuizDb:
                            VALUES (?, ?, ?, ?, ?)''',
                            (insert_timestamp, message.timestamp, message.update_id, message.chat_id, message.text))
 
-    def select_teams(self, *, quiz_id: str) -> Dict[int, str]:
-        teams: Dict[int, str] = {}
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
-            with db:
-                cursor = db.execute('SELECT MAX(timestamp), chat_id, name '
-                                    'FROM teams WHERE quiz_id = ? GROUP BY chat_id', (quiz_id,))
-                for (_, chat_id, name) in cursor:
-                    teams[chat_id] = name
-        return teams
-
     def select_messages(self) -> List[Message]:
         messages: List[Message] = []
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
@@ -101,14 +92,48 @@ class QuizDb:
                     messages.append(message)
         return messages
 
+    def insert_team(self, team: Team) -> None:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                db.execute('''INSERT INTO teams
+                     (quiz_id, id, name, timestamp)
+                     VALUES (?, ?, ?, ?)''', (team.quiz_id, team.id, team.name, team.timestamp))
+
+    def get_teams_for_quiz(self, quiz_id: str) -> List[Team]:
+        teams: List[Team] = []
+        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                cursor = db.execute('SELECT quiz_id, id, name, MAX(timestamp) '
+                                    'FROM teams WHERE quiz_id = ? GROUP BY id', (quiz_id,))
+                for (quiz_id, id, name, timestamp) in cursor:
+                    teams.append(Team(
+                        quiz_id=quiz_id,
+                        id=id,
+                        name=name,
+                        timestamp=timestamp
+                    ))
+        return teams
+
+    def get_team(self, *, quiz_id: str, team_id: int) -> Optional[Team]:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                cursor = db.execute('SELECT quiz_id, id, name, MAX(timestamp) '
+                                    'FROM teams WHERE quiz_id = ? AND id = ? '
+                                    'GROUP BY quiz_id, id', (quiz_id, team_id))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                (quiz_id, id, name, timestamp) = row
+                return Team(quiz_id=quiz_id, id=id, name=name, timestamp=timestamp)
+
     def create_if_not_exists(self):
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 db.execute('''CREATE TABLE IF NOT EXISTS teams (
-                    timestamp INTEGER NOT NULL,
-                    chat_id INTEGER NOT NULL,
                     quiz_id TEXT NOT NULL,
-                    name TEXT NOT NULL)''')
+                    id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    timestamp INTEGER NOT NULL)''')
                 db.execute('''CREATE TABLE IF NOT EXISTS answers (
                     quiz_id TEXT NOT NULL,
                     question INT NOT NULL,

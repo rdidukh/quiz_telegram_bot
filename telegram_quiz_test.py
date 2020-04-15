@@ -1,6 +1,6 @@
 from datetime import datetime
 from telegram_quiz import TelegramQuiz, TelegramQuizError
-from quiz_db import Answer, Message, QuizDb
+from quiz_db import Answer, Message, QuizDb, Team
 import tempfile
 import telegram
 import telegram.ext
@@ -36,13 +36,13 @@ class TestTelegramQuiz(unittest.TestCase):
     @patch('telegram.ext.CallbackContext')
     def test_handle_registration_update(self, mock_callback_context):
         self.quiz_db.insert_team(
-            chat_id=1, quiz_id='test', name='Foo', timestamp=1)
+            Team(quiz_id='test', id=1, name='Foo', timestamp=1))
         self.quiz_db.insert_team(
-            chat_id=1, quiz_id='other', name='Foo', timestamp=2)
+            Team(quiz_id='other', id=1, name='Foo', timestamp=2))
         self.quiz_db.insert_team(
-            chat_id=2, quiz_id='test', name='Bar', timestamp=2)
+            Team(quiz_id='test', id=2, name='Bar', timestamp=2))
         self.quiz_db.insert_team(
-            chat_id=5001, quiz_id='test', name='OldName', timestamp=100)
+            Team(quiz_id='test', id=5001, name='OldName', timestamp=100))
 
         quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=1, language='lang',
                             strings_file=self.strings_file, quiz_db=self.quiz_db)
@@ -73,8 +73,9 @@ class TestTelegramQuiz(unittest.TestCase):
         quiz._handle_registration_update(update, context)
 
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'NewName'}, quiz.teams)
-        self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'NewName'},
-                             self.quiz_db.select_teams(quiz_id='test'))
+        self.assertListEqual([
+
+        ], self.quiz_db.get_answers_for_quiz(quiz_id='test'))
         update.message.reply_text.assert_called_with('Good luck!')
 
     def test_start_stop_registration(self):
@@ -99,10 +100,8 @@ class TestTelegramQuiz(unittest.TestCase):
 
     @patch('telegram.ext.CallbackContext')
     def test_handle_answer_update(self, mock_callback_context):
-        self.quiz_db.insert_team(
-            chat_id=5001, quiz_id='test', name='Liverpool', timestamp=1)
-        self.quiz_db.insert_team(
-            chat_id=5002, quiz_id='test', name='Tottenham', timestamp=1)
+        self.quiz_db.insert_team(Team(quiz_id='test', id=5001, name='Liverpool', timestamp=1))
+        self.quiz_db.insert_team(Team(quiz_id='test', id=5002, name='Tottenham', timestamp=1))
 
         self.quiz_db.insert_answer(
             Answer(quiz_id='test', question=1, team_id=5001, answer='Apple', timestamp=1))
