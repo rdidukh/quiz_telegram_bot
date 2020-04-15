@@ -8,6 +8,11 @@ import tornado.web
 from typing import Any, Dict
 
 
+class RootHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.redirect('/index.html')
+
+
 class BaseQuizRequestHandler(tornado.web.RequestHandler):
     def initialize(self, quiz: TelegramQuiz):
         self.quiz = quiz
@@ -43,9 +48,28 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
         self.write(json.dumps(response))
 
 
-class RootHandler(tornado.web.RequestHandler):
-    def get(self):
-        self.redirect('/index.html')
+class GetAnswersApiHandler(BaseQuizRequestHandler):
+    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        id_greater_than = request.get('id_greater_than')
+        if id_greater_than is None:
+            return {'error': 'Parameter id_greater_than was not provided.'}
+        answers = self.quiz.quiz_db.get_answers(
+            quiz_id=self.quiz.id, id_greater_than=id_greater_than)
+        return {"answers": [a.__dict__ for a in answers]}
+
+
+class GetStatusApiHandler(BaseQuizRequestHandler):
+    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            'quiz_id': self.quiz.id,
+            'teams': self.quiz.teams,
+            'answers': self.quiz.answers,
+            'question_set': sorted(list(self.quiz.question_set)),
+            "number_of_questions": self.quiz.number_of_questions,
+            "language": self.quiz.language,
+            'question_id': self.quiz.question_id,
+            'is_registration': self.quiz.is_registration()
+        }
 
 
 class StartRegistrationApiHandler(BaseQuizRequestHandler):
@@ -64,7 +88,7 @@ class StartQuestionApiHandler(BaseQuizRequestHandler):
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         question_id = request.get('question_id')
         if not question_id:
-            return {'ok': False, 'error': 'Question not provided.'}
+            return {'error': 'Question not provided.'}
         self.quiz.start_question(question_id=question_id)
         return {}
 
@@ -75,27 +99,15 @@ class StopQuestionApiHandler(BaseQuizRequestHandler):
         return {}
 
 
-class GetStatusApiHandler(BaseQuizRequestHandler):
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            'quiz_id': self.quiz.id,
-            'teams': self.quiz.teams,
-            'answers': self.quiz.answers,
-            'question_set': sorted(list(self.quiz.question_set)),
-            "number_of_questions": self.quiz.number_of_questions,
-            "language": self.quiz.language,
-            'question_id': self.quiz.question_id,
-            'is_registration': self.quiz.is_registration()
-        }
-
-
 def create_quiz_tornado_app(*, quiz: TelegramQuiz) -> tornado.web.Application:
+    args = dict(quiz=quiz)
     return tornado.web.Application([
         ('/', RootHandler),
-        ('/api/startRegistration', StartRegistrationApiHandler, dict(quiz=quiz)),
-        ('/api/stopRegistration', StopRegistrationApiHandler, dict(quiz=quiz)),
-        ('/api/startQuestion', StartQuestionApiHandler, dict(quiz=quiz)),
-        ('/api/stopQuestion', StopQuestionApiHandler, dict(quiz=quiz)),
-        ('/api/getStatus', GetStatusApiHandler, dict(quiz=quiz)),
+        ('/api/getAnswers', GetAnswersApiHandler, args),
+        ('/api/getStatus', GetStatusApiHandler, args),
+        ('/api/startRegistration', StartRegistrationApiHandler, args),
+        ('/api/stopRegistration', StopRegistrationApiHandler, args),
+        ('/api/startQuestion', StartQuestionApiHandler, args),
+        ('/api/stopQuestion', StopQuestionApiHandler, args),
         ('/(.*)', tornado.web.StaticFileHandler, {'path': 'static'}),
     ])

@@ -130,7 +130,7 @@ class QuizDbTest(unittest.TestCase):
             ('other', 12, 5002, 'Apple', 321, False, 0),
         ], _select_answers(self.db_path))
 
-    def test_get_answers_for_quiz(self):
+    def test_get_answers(self):
         _insert_into_answers(self.db_path, [{
             'quiz_id': 'test', 'question': 5, 'team_id': 5001,
             'answer': 'Ignored', 'timestamp': 122, 'checked': True, 'points': 11,
@@ -144,13 +144,20 @@ class QuizDbTest(unittest.TestCase):
             'quiz_id': 'test', 'question': 9, 'team_id': 5002,
             'answer': 'Unicode Юнікод 😎', 'timestamp': 34, 'checked': False, 'points': 0,
         }])
-        answers = self.quiz_db.get_answers_for_quiz('test')
+        answers = self.quiz_db.get_answers('test')
 
         self.assertListEqual(sorted([
             Answer(quiz_id='test', question=9, team_id=5002,
                    answer='Unicode Юнікод 😎', timestamp=34, checked=False, points=0),
             Answer(quiz_id='test', question=5, team_id=5001,
                    answer='Apple', timestamp=123, checked=True, points=11),
+        ]), sorted(answers))
+
+        id = sorted([a.id for a in answers])[0]
+        answers = self.quiz_db.get_answers('test', id_greater_than=id)
+        self.assertListEqual(sorted([
+            Answer(quiz_id='test', question=9, team_id=5002,
+                   answer='Unicode Юнікод 😎', timestamp=34, checked=False, points=0),
         ]), sorted(answers))
 
 

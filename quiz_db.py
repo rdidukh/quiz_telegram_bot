@@ -39,13 +39,13 @@ class QuizDb:
         self.db_path = db_path
         self.create_if_not_exists()
 
-    def get_answers_for_quiz(self, quiz_id: str) -> List[Answer]:
+    def get_answers(self, quiz_id: str, *, id_greater_than: int = 0) -> List[Answer]:
         answers: List[Answer] = []
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 cursor = db.execute(
                     'SELECT rowid, quiz_id, question, team_id, answer, MAX(timestamp), checked, points FROM answers '
-                    'WHERE quiz_id = ? GROUP BY quiz_id, question, team_id', (quiz_id,))
+                    'WHERE quiz_id = ? AND rowid > ? GROUP BY quiz_id, question, team_id', (quiz_id, id_greater_than))
 
                 for (id, quiz_id, question, team_id, answer, timestamp, checked, points) in cursor:
                     answers.append(Answer(id=id,
@@ -54,7 +54,7 @@ class QuizDb:
                                           team_id=team_id,
                                           answer=answer,
                                           timestamp=timestamp,
-                                          checked=checked,
+                                          checked=bool(checked),
                                           points=points))
         return answers
 

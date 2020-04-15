@@ -79,7 +79,7 @@ class TelegramQuiz:
         if self._answers_for_testing:
             return self._answers_for_testing
         result: Dict[str, Dict[int, str]] = {}
-        answers = self.quiz_db.get_answers_for_quiz(quiz_id=self.id)
+        answers = self.quiz_db.get_answers(quiz_id=self.id)
         for answer in answers:
             question = f'{answer.question:02}'
             if question not in result:

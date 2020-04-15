@@ -1,6 +1,6 @@
 import json
 import os
-from quiz_db import QuizDb
+from quiz_db import Answer, QuizDb
 from quiz_http_server import create_quiz_tornado_app
 from telegram_quiz import TelegramQuiz
 from telegram_quiz_test import STRINGS
@@ -135,6 +135,78 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
                 }
             },
         }, json.loads(response.body))
+
+    def test_get_answers(self):
+        self.quiz_db.insert_answer(
+            Answer(quiz_id='test', question=1, team_id=5001, answer='Ignored', timestamp=122, checked=True, points=7))
+        self.quiz_db.insert_answer(
+            Answer(quiz_id='test', question=1, team_id=5001, answer='Apple', timestamp=123, checked=True, points=7))
+        self.quiz_db.insert_answer(
+            Answer(quiz_id='test', question=1, team_id=5002, answer='Banana', timestamp=121, checked=False, points=3))
+        self.quiz_db.insert_answer(
+            Answer(quiz_id='ignored', question=2, team_id=5001, answer='Avocado', timestamp=125, checked=False, points=4))
+        self.quiz_db.insert_answer(
+            Answer(quiz_id='test', question=2, team_id=5001, answer='Andorra', timestamp=126))
+
+        response = self.fetch('/api/getAnswers', method='POST', body='{"id_greater_than": 0}')
+
+        self.assertEqual(200, response.code)
+        self.assertListEqual([
+            {
+                'quiz_id': 'test',
+                'question': 1,
+                'team_id': 5001,
+                'answer': 'Apple',
+                'timestamp': 123,
+                'checked': True,
+                'points': 7,
+                'id': 2,
+            }, {
+                'quiz_id': 'test',
+                'question': 1,
+                'team_id': 5002,
+                'answer': 'Banana',
+                'timestamp': 121,
+                'checked': False,
+                'points': 3,
+                'id': 3,
+            }, {
+                'quiz_id': 'test',
+                'question': 2,
+                'team_id': 5001,
+                'answer': 'Andorra',
+                'timestamp': 126,
+                'checked': False,
+                'points': 0,
+                'id': 5,
+            },
+        ], json.loads(response.body)['answers'])
+
+        response = self.fetch('/api/getAnswers', method='POST', body='{"id_greater_than": 3}')
+
+        self.assertEqual(200, response.code)
+        self.assertListEqual([
+            {
+                'quiz_id': 'test',
+                'question': 2,
+                'team_id': 5001,
+                'answer': 'Andorra',
+                'timestamp': 126,
+                'checked': False,
+                'points': 0,
+                'id': 5,
+            },
+        ], json.loads(response.body)['answers'])
+
+        response = self.fetch('/api/getAnswers', method='POST', body='{"id_greater_than": 5}')
+
+        self.assertEqual(200, response.code)
+        self.assertDictEqual({'answers': []}, json.loads(response.body))
+
+    def test_get_answers_no_id_given(self):
+        response = self.fetch('/api/getAnswers', method='POST', body='{}')
+        self.assertEqual(400, response.code)
+        self.assertIn('error', json.loads(response.body))
 
 
 if __name__ == '__main__':

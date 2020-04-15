@@ -75,7 +75,7 @@ class TestTelegramQuiz(unittest.TestCase):
         self.assertDictEqual({1: 'Foo', 2: 'Bar', 5001: 'NewName'}, quiz.teams)
         self.assertListEqual([
 
-        ], self.quiz_db.get_answers_for_quiz(quiz_id='test'))
+        ], self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_called_with('Good luck!')
 
     def test_start_stop_registration(self):
@@ -133,7 +133,7 @@ class TestTelegramQuiz(unittest.TestCase):
         expected_answers_dict = {'01': {5001: 'Banana', 5002: 'Orange'}}
         self.assertDictEqual(expected_answers_dict, quiz.answers)
         self.assertListEqual(
-            expected_answers, self.quiz_db.get_answers_for_quiz(quiz_id='test'))
+            expected_answers, self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_called_with('Confirmed.')
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
@@ -155,7 +155,7 @@ class TestTelegramQuiz(unittest.TestCase):
         expected_answers_dict = {'01': {5001: 'Banana', 5002: 'Orange'}}
         self.assertDictEqual(expected_answers_dict, quiz.answers)
         self.assertListEqual(
-            expected_answers, self.quiz_db.get_answers_for_quiz(quiz_id='test'))
+            expected_answers, self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_not_called()
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
@@ -182,7 +182,7 @@ class TestTelegramQuiz(unittest.TestCase):
 
         self.assertDictEqual(expected_answers_dict, quiz.answers)
         self.assertListEqual(
-            expected_answers, self.quiz_db.get_answers_for_quiz(quiz_id='test'))
+            expected_answers, self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_called_once()
 
     def test_start_stop_question(self):
