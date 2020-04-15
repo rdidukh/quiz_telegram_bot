@@ -27,9 +27,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt -r requirements-dev.txt
-    - name: Lint with flake8
+    - name: Flake8
       run:
         flake8 . --count --max-line-length=127  --show-source --statistics
-    - name: Test with pytest
+    - name: Pytype
+      if: matrix.python-version != 3.8
+      run:
+        pytype .
+    - name: Pytest
       run: |
         pytest
