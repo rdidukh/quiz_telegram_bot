@@ -50,11 +50,11 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
 
 class GetAnswersApiHandler(BaseQuizRequestHandler):
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        id_greater_than = request.get('id_greater_than')
-        if id_greater_than is None:
-            return {'error': 'Parameter id_greater_than was not provided.'}
+        update_id_greater_than = request.get('update_id_greater_than')
+        if update_id_greater_than is None:
+            return {'error': 'Parameter update_id_greater_than was not provided.'}
         answers = self.quiz.quiz_db.get_answers(
-            quiz_id=self.quiz.id, id_greater_than=id_greater_than)
+            quiz_id=self.quiz.id, update_id_greater_than=update_id_greater_than)
         return {"answers": [a.__dict__ for a in answers]}
 
 

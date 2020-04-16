@@ -19,11 +19,6 @@ class Strings:
     answer_confirmation: str = ''
 
 
-def _create_team_index(*, quiz_id: str, quiz_db: QuizDb) -> Dict[int, Team]:
-    teams = quiz_db.get_teams_for_quiz(quiz_id)
-    return {team.id: team for team in teams}
-
-
 class TelegramQuiz:
     def __init__(self, *, id: str,
                  bot_token: str,
@@ -97,7 +92,7 @@ class TelegramQuiz:
     def teams(self) -> Dict[int, str]:
         if self._teams_for_testing:
             return self._teams_for_testing
-        teams = self.quiz_db.get_teams_for_quiz(self.id)
+        teams = self.quiz_db.get_teams(quiz_id=self.id)
         return {team.id: team.name for team in teams}
 
     # DEPRECATED: Left for testing only.
@@ -161,9 +156,10 @@ class TelegramQuiz:
         chat_id = update.message.chat_id
         answer = update.message.text
         timestamp = update.message.date.timestamp()
-        team = self.quiz_db.get_team(quiz_id=self.id, team_id=chat_id)
-        if team is None:
+        teams = self.quiz_db.get_teams(quiz_id=self.id, team_id=chat_id)
+        if not teams:
             return
+        team = teams[0]
         logging.info(f'Answer received. '
                      f'question_id: {self.question_id}, quiz_id: {self.id}, team_id: {team.id}, '
                      f'team: "{team.name}", answer: "{answer}"')

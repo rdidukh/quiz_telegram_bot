@@ -138,17 +138,17 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
 
     def test_get_answers(self):
         self.quiz_db.insert_answer(
-            Answer(quiz_id='test', question=1, team_id=5001, answer='Ignored', timestamp=122, checked=True, points=7))
+            Answer(quiz_id='test', question=1, team_id=5001, answer='Ignored', timestamp=122))
         self.quiz_db.insert_answer(
-            Answer(quiz_id='test', question=1, team_id=5001, answer='Apple', timestamp=123, checked=True, points=7))
+            Answer(quiz_id='test', question=1, team_id=5001, answer='Apple', timestamp=123))
         self.quiz_db.insert_answer(
-            Answer(quiz_id='test', question=1, team_id=5002, answer='Banana', timestamp=121, checked=False, points=3))
+            Answer(quiz_id='test', question=1, team_id=5002, answer='Banana', timestamp=121))
         self.quiz_db.insert_answer(
-            Answer(quiz_id='ignored', question=2, team_id=5001, answer='Avocado', timestamp=125, checked=False, points=4))
+            Answer(quiz_id='ignored', question=2, team_id=5001, answer='Avocado', timestamp=125))
         self.quiz_db.insert_answer(
             Answer(quiz_id='test', question=2, team_id=5001, answer='Andorra', timestamp=126))
 
-        response = self.fetch('/api/getAnswers', method='POST', body='{"id_greater_than": 0}')
+        response = self.fetch('/api/getAnswers', method='POST', body='{"update_id_greater_than": 0}')
 
         self.assertEqual(200, response.code)
         self.assertListEqual([
@@ -158,31 +158,25 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
                 'team_id': 5001,
                 'answer': 'Apple',
                 'timestamp': 123,
-                'checked': True,
-                'points': 7,
-                'id': 2,
+                'update_id': 2,
             }, {
                 'quiz_id': 'test',
                 'question': 1,
                 'team_id': 5002,
                 'answer': 'Banana',
                 'timestamp': 121,
-                'checked': False,
-                'points': 3,
-                'id': 3,
+                'update_id': 3,
             }, {
                 'quiz_id': 'test',
                 'question': 2,
                 'team_id': 5001,
                 'answer': 'Andorra',
                 'timestamp': 126,
-                'checked': False,
-                'points': 0,
-                'id': 5,
+                'update_id': 5,
             },
         ], json.loads(response.body)['answers'])
 
-        response = self.fetch('/api/getAnswers', method='POST', body='{"id_greater_than": 3}')
+        response = self.fetch('/api/getAnswers', method='POST', body='{"update_id_greater_than": 3}')
 
         self.assertEqual(200, response.code)
         self.assertListEqual([
@@ -192,13 +186,11 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
                 'team_id': 5001,
                 'answer': 'Andorra',
                 'timestamp': 126,
-                'checked': False,
-                'points': 0,
-                'id': 5,
+                'update_id': 5,
             },
         ], json.loads(response.body)['answers'])
 
-        response = self.fetch('/api/getAnswers', method='POST', body='{"id_greater_than": 5}')
+        response = self.fetch('/api/getAnswers', method='POST', body='{"update_id_greater_than": 5}')
 
         self.assertEqual(200, response.code)
         self.assertDictEqual({'answers': []}, json.loads(response.body))
