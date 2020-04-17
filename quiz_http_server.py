@@ -1,6 +1,6 @@
 import json
 import logging
-from telegram_quiz import TelegramQuiz, TelegramQuizError
+from telegram_quiz import TelegramQuiz, TelegramQuizError, Updates
 import tornado.httpserver
 import tornado.ioloop
 import tornado.netutil
@@ -48,16 +48,6 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
         self.write(json.dumps(response))
 
 
-class GetAnswersApiHandler(BaseQuizRequestHandler):
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        update_id_greater_than = request.get('update_id_greater_than')
-        if update_id_greater_than is None:
-            return {'error': 'Parameter update_id_greater_than was not provided.'}
-        answers = self.quiz.quiz_db.get_answers(
-            quiz_id=self.quiz.id, update_id_greater_than=update_id_greater_than)
-        return {"answers": [a.__dict__ for a in answers]}
-
-
 class GetStatusApiHandler(BaseQuizRequestHandler):
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         return {
@@ -70,6 +60,25 @@ class GetStatusApiHandler(BaseQuizRequestHandler):
             'question_id': self.quiz.question_id,
             'is_registration': self.quiz.is_registration()
         }
+
+
+class GetUpdatesApiHandler(BaseQuizRequestHandler):
+    def _updates_to_json(self, updates: Updates) -> Dict[str, Any]:
+        return {
+            'status': updates.status.__dict__,
+            'teams': [t.__dict__ for t in updates.teams],
+            'answers': [a.__dict__ for a in updates.answers],
+        }
+
+    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        update_id_greater_than = request.get('update_id_greater_than')
+        if update_id_greater_than is None:
+            return {'error': 'Parameter update_id_greater_than was not provided.'}
+        if not isinstance(update_id_greater_than, int):
+            return {'error': 'Parameter update_id_greater_than must be integer.'}
+        updates = self.quiz.get_updates(
+            update_id_greater_than=update_id_greater_than)
+        return self._updates_to_json(updates)
 
 
 class StartRegistrationApiHandler(BaseQuizRequestHandler):
@@ -103,8 +112,8 @@ def create_quiz_tornado_app(*, quiz: TelegramQuiz) -> tornado.web.Application:
     args = dict(quiz=quiz)
     return tornado.web.Application([
         ('/', RootHandler),
-        ('/api/getAnswers', GetAnswersApiHandler, args),
         ('/api/getStatus', GetStatusApiHandler, args),
+        ('/api/getUpdates', GetUpdatesApiHandler, args),
         ('/api/startRegistration', StartRegistrationApiHandler, args),
         ('/api/stopRegistration', StopRegistrationApiHandler, args),
         ('/api/startQuestion', StartQuestionApiHandler, args),
