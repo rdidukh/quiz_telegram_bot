@@ -1,11 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 import json
 import logging
-from quiz_db import Message, QuizDb
+from quiz_db import Answer, Message, QuizDb, Team
 import telegram.ext
 import telegram.update
 import time
-from typing import Dict, Set
+from typing import Dict, List, Optional, Set
 
 
 class TelegramQuizError(Exception):
@@ -17,6 +18,23 @@ class Strings:
     registration_invitation: str = ''
     registration_confirmation: str = ''
     answer_confirmation: str = ''
+
+
+@dataclass
+class QuizStatus:
+    quiz_id: str
+    number_of_questions: int
+    language: str
+    question: Optional[int]
+    registration: bool
+    time: str = field(default=None, compare=False)
+
+
+@dataclass
+class Updates:
+    status: QuizStatus
+    teams: List[Team]
+    answers: List[Answer]
 
 
 class TelegramQuiz:
@@ -253,3 +271,17 @@ class TelegramQuiz:
 
     def stop(self):
         self.updater.stop()
+
+    def get_updates(self, update_id_greater_than: int) -> Updates:
+        status = QuizStatus(quiz_id=self.id,
+                            number_of_questions=self.number_of_questions,
+                            language=self.language,
+                            question=int(
+                                self.question_id) if self.question_id else None,
+                            registration=bool(self.registration_handler),
+                            time=datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
+        teams = self.quiz_db.get_teams(
+            quiz_id=self.id, update_id_greater_than=update_id_greater_than)
+        answers = self.quiz_db.get_answers(
+            quiz_id=self.id, update_id_greater_than=update_id_greater_than)
+        return Updates(status=status, teams=teams, answers=answers)

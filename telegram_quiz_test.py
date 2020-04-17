@@ -1,5 +1,5 @@
 from datetime import datetime
-from telegram_quiz import TelegramQuiz, TelegramQuizError
+from telegram_quiz import QuizStatus, TelegramQuiz, TelegramQuizError, Updates
 from quiz_db import Answer, Message, QuizDb, Team
 import tempfile
 import telegram
@@ -120,7 +120,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         self.quiz._handle_registration_update(update, context)
 
         self.assertListEqual([
-            Team(update_id=1, quiz_id='test', id=5001, name='Unicode Юнікод 😎',
+            Team(update_id=2, quiz_id='test', id=5001, name='Unicode Юнікод 😎',
                  timestamp=123)
         ], self.quiz_db.get_teams(quiz_id='test'))
         self.assertNotIn('typing_name', context.chat_data)
@@ -142,7 +142,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         self.quiz._handle_registration_update(update, context)
 
         self.assertListEqual([
-            Team(update_id=2, quiz_id='test', id=5001, name='Banana',
+            Team(quiz_id='test', id=5001, name='Banana',
                  timestamp=123)
         ], self.quiz_db.get_teams(quiz_id='test'))
         self.assertNotIn('typing_name', context.chat_data)
@@ -163,7 +163,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         self.quiz._handle_registration_update(update, context)
 
         self.assertListEqual([
-            Team(update_id=1, quiz_id='test', id=5001, name='Apple',
+            Team(quiz_id='test', id=5001, name='Apple',
                  timestamp=124)
         ], self.quiz_db.get_teams(quiz_id='test'))
         self.assertNotIn('typing_name', context.chat_data)
@@ -187,7 +187,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
         self.quiz.stop_question()
 
         self.assertListEqual([
-            Answer(update_id=1, quiz_id='test', question=1, team_id=5001,
+            Answer(quiz_id='test', question=1, team_id=5001,
                    answer='Banana', timestamp=4),
         ], self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_called_with('Confirmed: Banana.')
@@ -210,7 +210,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
         self.quiz.stop_question()
 
         expected_answers = [
-            Answer(update_id=2, quiz_id='test', question=1, team_id=5001,
+            Answer(quiz_id='test', question=1, team_id=5001,
                    answer='Banana', timestamp=4),
         ]
 
@@ -256,10 +256,135 @@ class HandleAnswerUpdateTest(BaseTestCase):
         self.quiz.stop_question()
 
         self.assertListEqual([
-            Answer(update_id=1, quiz_id='test', question=1,
+            Answer(quiz_id='test', question=1,
                    team_id=5001, answer='Banana', timestamp=5),
         ], self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_not_called()
+
+
+class HandleGetUpdatesTest(BaseTestCase):
+    def test_init(self):
+        updates = self.quiz.get_updates(update_id_greater_than=0)
+        self.assertEqual(Updates(
+            status=QuizStatus(
+                quiz_id='test',
+                number_of_questions=2,
+                language='lang',
+                question=None,
+                registration=False,
+            ),
+            teams=[],
+            answers=[],
+        ), updates)
+
+    def test_start_registration(self):
+        self.quiz.start_registration()
+        updates = self.quiz.get_updates(update_id_greater_than=0)
+        self.assertEqual(Updates(
+            status=QuizStatus(
+                quiz_id='test',
+                number_of_questions=2,
+                language='lang',
+                question=None,
+                registration=True,
+            ),
+            teams=[],
+            answers=[],
+        ), updates)
+
+    def test_stop_registration(self):
+        self.quiz.start_registration()
+        self.quiz.stop_registration()
+        updates = self.quiz.get_updates(update_id_greater_than=0)
+        self.assertEqual(Updates(
+            status=QuizStatus(
+                quiz_id='test',
+                number_of_questions=2,
+                language='lang',
+                question=None,
+                registration=False,
+            ),
+            teams=[],
+            answers=[],
+        ), updates)
+
+    def test_start_question(self):
+        self.quiz.start_question('01')
+        updates = self.quiz.get_updates(
+            update_id_greater_than=0)
+        self.assertEqual(Updates(
+            status=QuizStatus(
+                quiz_id='test',
+                number_of_questions=2,
+                language='lang',
+                question=1,
+                registration=False,
+            ),
+            teams=[],
+            answers=[],
+        ), updates)
+
+    def test_stop_question(self):
+        self.quiz.start_question('01')
+        self.quiz.stop_question()
+        updates = self.quiz.get_updates(
+            update_id_greater_than=0)
+        self.assertEqual(Updates(
+            status=QuizStatus(
+                quiz_id='test',
+                number_of_questions=2,
+                language='lang',
+                question=None,
+                registration=False,
+            ),
+            teams=[],
+            answers=[],
+        ), updates)
+
+    def test_teams_and_answers(self):
+        self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Liverpool', registration_time=123)
+        self.quiz_db.update_answer(
+            quiz_id='test', question=2, team_id=5002, answer='Apple', answer_time=125)
+        updates = self.quiz.get_updates(update_id_greater_than=0)
+        self.assertEqual(Updates(
+            status=QuizStatus(
+                quiz_id='test',
+                number_of_questions=2,
+                language='lang',
+                question=None,
+                registration=False,
+            ),
+            teams=[
+                Team(quiz_id='test', id=5001,
+                     name='Liverpool', timestamp=123)
+            ],
+            answers=[
+                Answer(quiz_id='test', question=2, team_id=5002,
+                       answer='Apple', timestamp=125)
+            ],
+        ), updates)
+
+    def test_recent_teams_and_answers(self):
+        update_id = self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Liverpool', registration_time=123)
+        self.quiz_db.update_answer(
+            quiz_id='test', question=2, team_id=5002, answer='Apple', answer_time=125)
+        updates = self.quiz.get_updates(update_id_greater_than=update_id)
+        self.assertEqual(Updates(
+            status=QuizStatus(
+                quiz_id='test',
+                number_of_questions=2,
+                language='lang',
+                question=None,
+                registration=False,
+            ),
+            teams=[],
+            answers=[
+                Answer(quiz_id='test', question=2, team_id=5002,
+                       answer='Apple', timestamp=125)
+            ],
+        ), updates)
 
 
 if __name__ == '__main__':

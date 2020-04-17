@@ -30,7 +30,7 @@ class Team:
     id: int
     name: str
     timestamp: int
-    update_id: int = field(default=None)
+    update_id: int = field(default=None, compare=False)
 
 
 class QuizDb:

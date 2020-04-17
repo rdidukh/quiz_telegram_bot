@@ -7,7 +7,13 @@ from telegram_quiz_test import STRINGS
 import tempfile
 import tornado.testing
 import telegram
+from typing import Dict
 import unittest
+
+
+def _remove_key(d: Dict, key) -> Dict:
+    d.pop(key)
+    return d
 
 
 class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
@@ -148,7 +154,7 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
 
         response = self.fetch('/api/getAnswers', method='POST',
                               body='{"update_id_greater_than": 0}')
-
+        answers = json.loads(response.body)['answers']
         self.assertEqual(200, response.code)
         self.assertListEqual([
             {
@@ -157,27 +163,24 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
                 'team_id': 5001,
                 'answer': 'Apple',
                 'timestamp': 123,
-                'update_id': 1,
             }, {
                 'quiz_id': 'test',
                 'question': 1,
                 'team_id': 5002,
                 'answer': 'Banana',
                 'timestamp': 121,
-                'update_id': 2,
             }, {
                 'quiz_id': 'test',
                 'question': 2,
                 'team_id': 5001,
                 'answer': 'Andorra',
                 'timestamp': 126,
-                'update_id': 4,
             },
-        ], json.loads(response.body)['answers'])
+        ], [_remove_key(a, 'update_id') for a in answers])
 
         response = self.fetch('/api/getAnswers', method='POST',
                               body='{"update_id_greater_than": 3}')
-
+        answers = json.loads(response.body)['answers']
         self.assertEqual(200, response.code)
         self.assertListEqual([
             {
@@ -186,15 +189,13 @@ class TestQuizHttpServer(tornado.testing.AsyncHTTPTestCase):
                 'team_id': 5001,
                 'answer': 'Andorra',
                 'timestamp': 126,
-                'update_id': 4,
             },
-        ], json.loads(response.body)['answers'])
+        ], [_remove_key(a, 'update_id') for a in answers])
 
         response = self.fetch('/api/getAnswers', method='POST',
                               body='{"update_id_greater_than": 5}')
-
         self.assertEqual(200, response.code)
-        self.assertDictEqual({'answers': []}, json.loads(response.body))
+        self.assertDictEqual({'answers': []},  json.loads(response.body))
 
     def test_get_answers_no_id_given(self):
         response = self.fetch('/api/getAnswers', method='POST', body='{}')
