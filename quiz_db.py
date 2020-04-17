@@ -56,14 +56,30 @@ class QuizDb:
                                           timestamp=timestamp))
         return answers
 
-    def insert_answer(self, answer: Answer):
+    def update_answer(self, *, quiz_id: str, question: int, team_id: int, answer: str, answer_time: int) -> int:
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
+                (timestamp,) = db.execute('SELECT timestamp '
+                                          'FROM answers '
+                                          'WHERE quiz_id = ? AND question = ? AND team_id = ?',
+                                          (quiz_id, question, team_id)).fetchone() or (0,)
+
+                if timestamp > answer_time:
+                    return 0
+
                 update_id = self._increment_update_id_counter(db)
-                a = answer
-                db.execute('INSERT INTO answers (update_id, quiz_id, question, team_id, answer, timestamp) '
-                           'VALUES (?, ?, ?, ?, ?, ?)',
-                           (update_id, a.quiz_id, a.question, a.team_id, a.answer, a.timestamp))
+
+                if timestamp:
+                    db.execute('UPDATE answers '
+                               'SET update_id = ?, answer = ?, timestamp = ? '
+                               'WHERE quiz_id = ? AND question = ? AND team_id = ?',
+                               (update_id, answer, answer_time, quiz_id, question, team_id))
+                else:
+                    db.execute('INSERT INTO answers (update_id, quiz_id, question, team_id, answer, timestamp) '
+                               'VALUES (?, ?, ?, ?, ?, ?)',
+                               (update_id, quiz_id, question, team_id, answer, answer_time))
+
+                return update_id
 
     def insert_message(self, message: Message):
         insert_timestamp = message.insert_timestamp or int(
@@ -154,7 +170,8 @@ class QuizDb:
                     question INT NOT NULL,
                     team_id INTEGER NOT NULL,
                     answer TEXT NOT NULL,
-                    timestamp INTEGER NOT NULL)''')
+                    timestamp INTEGER NOT NULL,
+                    UNIQUE(quiz_id, question, team_id))''')
                 db.execute('''CREATE TABLE IF NOT EXISTS messages (
                     insert_timestamp INTEGER NOT NULL,
                     timestamp INTEGER NOT NULL,
@@ -166,4 +183,5 @@ class QuizDb:
                 )''')
                 (count,) = db.execute('SELECT COUNT(*) FROM counters').fetchone()
                 if not count:
-                    db.execute('INSERT INTO counters (next_update_id) VALUES (1)')
+                    db.execute(
+                        'INSERT INTO counters (next_update_id) VALUES (1)')

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 import logging
-from quiz_db import Answer, Message, QuizDb, Team
+from quiz_db import Message, QuizDb, Team
 import telegram.ext
 import telegram.update
 import time
@@ -155,7 +155,7 @@ class TelegramQuiz:
         start_time = time.time()
         chat_id = update.message.chat_id
         answer = update.message.text
-        timestamp = update.message.date.timestamp()
+        answer_time = update.message.date.timestamp()
         teams = self.quiz_db.get_teams(quiz_id=self.id, team_id=chat_id)
         if not teams:
             return
@@ -164,17 +164,23 @@ class TelegramQuiz:
                      f'question_id: {self.question_id}, quiz_id: {self.id}, team_id: {team.id}, '
                      f'team: "{team.name}", answer: "{answer}"')
 
-        self.quiz_db.insert_answer(Answer(
+        update_id = self.quiz_db.update_answer(
             quiz_id=self.id,
             question=int(self.question_id),
             team_id=chat_id,
             answer=answer,
-            timestamp=timestamp,
-        ))
+            answer_time=answer_time,
+        )
 
-        update.message.reply_text(
-            self.strings.answer_confirmation.format(answer=answer))
-        logging.info(f'Answer update handler took {(time.time() - start_time):.6f} sec.')
+        if update_id:
+            update.message.reply_text(
+                self.strings.answer_confirmation.format(answer=answer))
+        else:
+            logging.warning(
+                f'Outdated answer. quiz_id: "{self.id}", question: {self.question_id}, '
+                'team_id: {chat_id}, answer: {answer}, time: {answer_time}')
+        logging.info(
+            f'Answer update handler took {(time.time() - start_time):.6f} sec.')
 
     def start_question(self, question_id: str):
         if self.registration_handler:
