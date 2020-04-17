@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 import logging
-from quiz_db import Message, QuizDb, Team
+from quiz_db import Message, QuizDb
 import telegram.ext
 import telegram.update
 import time
@@ -107,13 +107,17 @@ class TelegramQuiz:
         if context.chat_data.get('typing_name'):
             del context.chat_data['typing_name']
             text = update.message.text
-            timestamp = update.message.date.timestamp()
+            registration_time = update.message.date.timestamp()
             logging.info(
                 f'Registration message. chat_id: {chat_id}, quiz_id: "{self.id}", name: "{text}"')
-            message.reply_text(
-                self.strings.registration_confirmation.format(team=text))
-            self.quiz_db.insert_team(
-                Team(quiz_id=self.id, id=chat_id, name=text, timestamp=timestamp))
+            update_id = self.quiz_db.update_team(
+                quiz_id=self.id, team_id=chat_id, name=text, registration_time=registration_time)
+            if update_id:
+                message.reply_text(
+                    self.strings.registration_confirmation.format(team=text))
+            else:
+                logging.warning(
+                    f'Outdated registration. quiz_id: "{self.id}", chat_id: {chat_id}, name: {text}')
         else:
             logging.info(
                 f'Requesting a team to send their name. chat_id: {chat_id}, quiz_id: "{self.id}"')

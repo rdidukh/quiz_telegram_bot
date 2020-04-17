@@ -43,8 +43,8 @@ class QuizDb:
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 cursor = db.execute(
-                    'SELECT update_id, quiz_id, question, team_id, answer, MAX(timestamp) FROM answers '
-                    'WHERE quiz_id = ? AND update_id > ? GROUP BY quiz_id, question, team_id',
+                    'SELECT update_id, quiz_id, question, team_id, answer, timestamp FROM answers '
+                    'WHERE quiz_id = ? AND update_id > ?',
                     (quiz_id, update_id_greater_than))
 
                 for (update_id, quiz_id, question, team_id, answer, timestamp) in cursor:
@@ -107,14 +107,24 @@ class QuizDb:
                     messages.append(message)
         return messages
 
-    def insert_team(self, team: Team) -> None:
+    def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
+                (timestamp,) = db.execute('SELECT timestamp FROM teams WHERE quiz_id = ? AND id = ?',
+                                          (quiz_id, team_id)).fetchone() or (0,)
+                if timestamp > registration_time:
+                    return 0
                 update_id = self._increment_update_id_counter(db)
-                db.execute('INSERT INTO teams'
-                           '(update_id, quiz_id, id, name, timestamp)'
-                           'VALUES (?, ?, ?, ?, ?)',
-                           (update_id, team.quiz_id, team.id, team.name, team.timestamp))
+
+                if timestamp:
+                    db.execute('UPDATE teams SET update_id = ?, name = ?, timestamp = ? WHERE quiz_id = ? AND id = ?',
+                               (update_id, name, registration_time, quiz_id, team_id))
+                else:
+                    db.execute('INSERT INTO teams'
+                               '(update_id, quiz_id, id, name, timestamp)'
+                               'VALUES (?, ?, ?, ?, ?)',
+                               (update_id, quiz_id, team_id, name, registration_time))
+                return update_id
 
     def get_teams(self, *, quiz_id: str, team_id: Optional[int] = None, update_id_greater_than: int = 0) -> List[Team]:
         conditions = []
@@ -137,7 +147,7 @@ class QuizDb:
         teams: List[Team] = []
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
-                cursor = db.execute('SELECT update_id, quiz_id, id, name, MAX(timestamp) '
+                cursor = db.execute('SELECT update_id, quiz_id, id, name, timestamp '
                                     f'FROM teams {condition} '
                                     'GROUP BY id', params)
                 for (update_id, quiz_id, id, name, timestamp) in cursor:
@@ -163,7 +173,8 @@ class QuizDb:
                     quiz_id TEXT NOT NULL,
                     id INTEGER NOT NULL,
                     name TEXT NOT NULL,
-                    timestamp INTEGER NOT NULL)''')
+                    timestamp INTEGER NOT NULL,
+                    UNIQUE(quiz_id, id))''')
                 db.execute('''CREATE TABLE IF NOT EXISTS answers (
                     update_id INTEGER NOT NULL,
                     quiz_id TEXT NOT NULL,
@@ -181,7 +192,5 @@ class QuizDb:
                 db.execute('''CREATE TABLE IF NOT EXISTS counters (
                     next_update_id INTEGER
                 )''')
-                (count,) = db.execute('SELECT COUNT(*) FROM counters').fetchone()
-                if not count:
-                    db.execute(
-                        'INSERT INTO counters (next_update_id) VALUES (1)')
+                db.execute(
+                    'INSERT OR IGNORE INTO counters (rowid, next_update_id) VALUES (1, 1)')

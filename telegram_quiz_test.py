@@ -13,8 +13,8 @@ STRINGS = textwrap.dedent('''
     {
         "lang": {
             "registration_invitation": "Hello!",
-            "registration_confirmation": "Good luck!",
-            "answer_confirmation": "Confirmed."
+            "registration_confirmation": "Good luck, {team}!",
+            "answer_confirmation": "Confirmed: {answer}."
         }
     }
 ''')
@@ -36,51 +36,6 @@ class BaseTestCase(unittest.TestCase):
 
 
 class TestTelegramQuiz(BaseTestCase):
-
-    @patch('telegram.ext.CallbackContext')
-    def test_handle_registration_update(self, mock_callback_context):
-        self.quiz_db.insert_team(
-            Team(quiz_id='test', id=1, name='Foo', timestamp=1))
-        self.quiz_db.insert_team(
-            Team(quiz_id='other', id=1, name='Foo', timestamp=2))
-        self.quiz_db.insert_team(
-            Team(quiz_id='test', id=2, name='Bar', timestamp=2))
-        self.quiz_db.insert_team(
-            Team(quiz_id='test', id=5001, name='OldName', timestamp=100))
-
-        self.assertDictEqual(
-            {1: 'Foo', 2: 'Bar', 5001: 'OldName'}, self.quiz.teams)
-
-        update = telegram.update.Update(1001, message=telegram.message.Message(
-            2001, None,
-            datetime.fromtimestamp(1001001001),
-            chat=telegram.Chat(5001, 'private'), text='/start'))
-        update.message.reply_text = MagicMock()
-        context = mock_callback_context()
-        context.chat_data = {'typing_name': False}
-
-        self.quiz._handle_registration_update(update, context)
-
-        self.assertDictEqual(
-            {1: 'Foo', 2: 'Bar', 5001: 'OldName'}, self.quiz.teams)
-        update.message.reply_text.assert_called_with('Hello!')
-
-        update = telegram.update.Update(1001, message=telegram.message.Message(
-            2001, None,
-            datetime.fromtimestamp(1001002001),
-            chat=telegram.Chat(5001, 'private'), text='NewName'))
-        update.message.reply_text = MagicMock()
-        context = mock_callback_context()
-        context.chat_data = {'typing_name': True}
-
-        self.quiz._handle_registration_update(update, context)
-
-        self.assertDictEqual(
-            {1: 'Foo', 2: 'Bar', 5001: 'NewName'}, self.quiz.teams)
-        self.assertListEqual([
-
-        ], self.quiz_db.get_answers(quiz_id='test'))
-        update.message.reply_text.assert_called_with('Good luck!')
 
     def test_start_stop_registration(self):
         self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
@@ -134,11 +89,92 @@ class TestTelegramQuiz(BaseTestCase):
         ], self.quiz_db.select_messages())
 
 
+class HandleRegistrationUpdateTest(BaseTestCase):
+
+    @patch('telegram.ext.CallbackContext')
+    def test_sends_invitation(self, mock_callback_context):
+        update = telegram.update.Update(1001, message=telegram.message.Message(
+            2001, None,
+            datetime.fromtimestamp(1001001001),
+            chat=telegram.Chat(5001, 'private'), text='/start'))
+        update.message.reply_text = MagicMock()
+        context = mock_callback_context()
+        context.chat_data = {'typing_name': False}
+
+        self.quiz._handle_registration_update(update, context)
+
+        self.assertListEqual([], self.quiz_db.get_teams(quiz_id='test'))
+        self.assertEqual(True, context.chat_data['typing_name'])
+        update.message.reply_text.assert_called_with('Hello!')
+
+    @patch('telegram.ext.CallbackContext')
+    def test_registers_team(self, mock_callback_context):
+        update = telegram.update.Update(1001, message=telegram.message.Message(
+            2001, None,
+            datetime.fromtimestamp(123),
+            chat=telegram.Chat(5001, 'private'), text='Unicode Юнікод 😎'))
+        update.message.reply_text = MagicMock()
+        context = mock_callback_context()
+        context.chat_data = {'typing_name': True}
+
+        self.quiz._handle_registration_update(update, context)
+
+        self.assertListEqual([
+            Team(update_id=1, quiz_id='test', id=5001, name='Unicode Юнікод 😎',
+                 timestamp=123)
+        ], self.quiz_db.get_teams(quiz_id='test'))
+        self.assertNotIn('typing_name', context.chat_data)
+        update.message.reply_text.assert_called_with(
+            'Good luck, Unicode Юнікод 😎!')
+
+    @patch('telegram.ext.CallbackContext')
+    def test_updates_team(self, mock_callback_context):
+        self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Apple', registration_time=122)
+        update = telegram.update.Update(1001, message=telegram.message.Message(
+            2001, None,
+            datetime.fromtimestamp(123),
+            chat=telegram.Chat(5001, 'private'), text='Banana'))
+        update.message.reply_text = MagicMock()
+        context = mock_callback_context()
+        context.chat_data = {'typing_name': True}
+
+        self.quiz._handle_registration_update(update, context)
+
+        self.assertListEqual([
+            Team(update_id=2, quiz_id='test', id=5001, name='Banana',
+                 timestamp=123)
+        ], self.quiz_db.get_teams(quiz_id='test'))
+        self.assertNotIn('typing_name', context.chat_data)
+        update.message.reply_text.assert_called_with('Good luck, Banana!')
+
+    @patch('telegram.ext.CallbackContext')
+    def test_outdated_registration(self, mock_callback_context):
+        self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Apple', registration_time=124)
+        update = telegram.update.Update(1001, message=telegram.message.Message(
+            2001, None,
+            datetime.fromtimestamp(123),
+            chat=telegram.Chat(5001, 'private'), text='Banana'))
+        update.message.reply_text = MagicMock()
+        context = mock_callback_context()
+        context.chat_data = {'typing_name': True}
+
+        self.quiz._handle_registration_update(update, context)
+
+        self.assertListEqual([
+            Team(update_id=1, quiz_id='test', id=5001, name='Apple',
+                 timestamp=124)
+        ], self.quiz_db.get_teams(quiz_id='test'))
+        self.assertNotIn('typing_name', context.chat_data)
+        update.message.reply_text.assert_not_called()
+
+
 class HandleAnswerUpdateTest(BaseTestCase):
     @patch('telegram.ext.CallbackContext')
     def test_inserts_answer(self, mock_callback_context):
-        self.quiz_db.insert_team(
-            Team(quiz_id='test', id=5001, name='Liverpool', timestamp=1))
+        self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Liverpool', registration_time=1)
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -154,12 +190,12 @@ class HandleAnswerUpdateTest(BaseTestCase):
             Answer(update_id=1, quiz_id='test', question=1, team_id=5001,
                    answer='Banana', timestamp=4),
         ], self.quiz_db.get_answers(quiz_id='test'))
-        update.message.reply_text.assert_called_with('Confirmed.')
+        update.message.reply_text.assert_called_with('Confirmed: Banana.')
 
     @patch('telegram.ext.CallbackContext')
     def test_updates_answer(self, mock_callback_context):
-        self.quiz_db.insert_team(
-            Team(quiz_id='test', id=5001, name='Liverpool', timestamp=1))
+        self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Liverpool', registration_time=1)
         self.quiz_db.update_answer(
             quiz_id='test', question=1, team_id=5001, answer='Apple', answer_time=1)
 
@@ -182,12 +218,12 @@ class HandleAnswerUpdateTest(BaseTestCase):
         self.assertDictEqual(expected_answers_dict, self.quiz.answers)
         self.assertListEqual(
             expected_answers, self.quiz_db.get_answers(quiz_id='test'))
-        update.message.reply_text.assert_called_with('Confirmed.')
+        update.message.reply_text.assert_called_with('Confirmed: Banana.')
 
     @patch('telegram.ext.CallbackContext')
     def test_non_registered_team(self, mock_callback_context):
-        self.quiz_db.insert_team(
-            Team(quiz_id='test', id=5001, name='Liverpool', timestamp=1))
+        self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Liverpool', registration_time=1)
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -204,8 +240,8 @@ class HandleAnswerUpdateTest(BaseTestCase):
 
     @patch('telegram.ext.CallbackContext')
     def test_outdated_answer(self, mock_callback_context):
-        self.quiz_db.insert_team(
-            Team(quiz_id='test', id=5001, name='Liverpool', timestamp=1))
+        self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Liverpool', registration_time=1)
         self.quiz_db.update_answer(
             quiz_id='test', question=1, team_id=5001, answer='Banana', answer_time=5)
 
