@@ -1,5 +1,5 @@
 from datetime import datetime
-from telegram_quiz import QuizStatus, TelegramQuiz, TelegramQuizError, Updates
+from telegram_quiz import QuizStatus, TelegramQuiz, TelegramQuizError, Update
 from quiz_db import Answer, Message, QuizDb, Team
 import tempfile
 import telegram
@@ -265,81 +265,69 @@ class HandleAnswerUpdateTest(BaseTestCase):
 class HandleGetUpdatesTest(BaseTestCase):
     def test_init(self):
         updates = self.quiz.get_updates(update_id_greater_than=0)
-        self.assertEqual(Updates(
-            status=QuizStatus(
-                quiz_id='test',
-                number_of_questions=2,
-                language='lang',
-                question=None,
-                registration=False,
-            ),
-            teams=[],
-            answers=[],
-        ), updates)
+        self.assertListEqual([], updates)
 
     def test_start_registration(self):
         self.quiz.start_registration()
         updates = self.quiz.get_updates(update_id_greater_than=0)
-        self.assertEqual(Updates(
-            status=QuizStatus(
-                quiz_id='test',
-                number_of_questions=2,
-                language='lang',
-                question=None,
-                registration=True,
+
+        self.assertListEqual([
+            Update(
+                status=QuizStatus(
+                    quiz_id='test',
+                    number_of_questions=2,
+                    language='lang',
+                    question=None,
+                    registration=True,
+                )
             ),
-            teams=[],
-            answers=[],
-        ), updates)
+        ], updates)
 
     def test_stop_registration(self):
         self.quiz.start_registration()
         self.quiz.stop_registration()
         updates = self.quiz.get_updates(update_id_greater_than=0)
-        self.assertEqual(Updates(
-            status=QuizStatus(
-                quiz_id='test',
-                number_of_questions=2,
-                language='lang',
-                question=None,
-                registration=False,
-            ),
-            teams=[],
-            answers=[],
-        ), updates)
+        self.assertListEqual([
+            Update(
+                status=QuizStatus(
+                    quiz_id='test',
+                    number_of_questions=2,
+                    language='lang',
+                    question=None,
+                    registration=False,
+                ),
+            )], updates)
 
     def test_start_question(self):
         self.quiz.start_question('01')
         updates = self.quiz.get_updates(
             update_id_greater_than=0)
-        self.assertEqual(Updates(
-            status=QuizStatus(
-                quiz_id='test',
-                number_of_questions=2,
-                language='lang',
-                question=1,
-                registration=False,
-            ),
-            teams=[],
-            answers=[],
-        ), updates)
+        self.assertListEqual([
+            Update(
+                status=QuizStatus(
+                    quiz_id='test',
+                    number_of_questions=2,
+                    language='lang',
+                    question=1,
+                    registration=False,
+                ),
+            )], updates)
 
     def test_stop_question(self):
         self.quiz.start_question('01')
         self.quiz.stop_question()
         updates = self.quiz.get_updates(
             update_id_greater_than=0)
-        self.assertEqual(Updates(
-            status=QuizStatus(
-                quiz_id='test',
-                number_of_questions=2,
-                language='lang',
-                question=None,
-                registration=False,
-            ),
-            teams=[],
-            answers=[],
-        ), updates)
+        self.assertListEqual([
+            Update(
+                status=QuizStatus(
+                    quiz_id='test',
+                    number_of_questions=2,
+                    language='lang',
+                    question=None,
+                    registration=False,
+                ),
+            )], updates)
 
     def test_teams_and_answers(self):
         self.quiz_db.update_team(
@@ -347,23 +335,16 @@ class HandleGetUpdatesTest(BaseTestCase):
         self.quiz_db.update_answer(
             quiz_id='test', question=2, team_id=5002, answer='Apple', answer_time=125)
         updates = self.quiz.get_updates(update_id_greater_than=0)
-        self.assertEqual(Updates(
-            status=QuizStatus(
-                quiz_id='test',
-                number_of_questions=2,
-                language='lang',
-                question=None,
-                registration=False,
+        self.assertListEqual([
+            Update(
+                team=Team(quiz_id='test', id=5001,
+                          name='Liverpool', timestamp=123)
             ),
-            teams=[
-                Team(quiz_id='test', id=5001,
-                     name='Liverpool', timestamp=123)
-            ],
-            answers=[
-                Answer(quiz_id='test', question=2, team_id=5002,
-                       answer='Apple', timestamp=125)
-            ],
-        ), updates)
+            Update(
+                answer=Answer(quiz_id='test', question=2, team_id=5002,
+                              answer='Apple', timestamp=125)
+            )
+        ], updates)
 
     def test_recent_teams_and_answers(self):
         update_id = self.quiz_db.update_team(
@@ -371,20 +352,21 @@ class HandleGetUpdatesTest(BaseTestCase):
         self.quiz_db.update_answer(
             quiz_id='test', question=2, team_id=5002, answer='Apple', answer_time=125)
         updates = self.quiz.get_updates(update_id_greater_than=update_id)
-        self.assertEqual(Updates(
-            status=QuizStatus(
-                quiz_id='test',
-                number_of_questions=2,
-                language='lang',
-                question=None,
-                registration=False,
+        self.assertEqual([
+            Update(
+                status=QuizStatus(
+                    quiz_id='test',
+                    number_of_questions=2,
+                    language='lang',
+                    question=None,
+                    registration=False,
+                )
             ),
-            teams=[],
-            answers=[
-                Answer(quiz_id='test', question=2, team_id=5002,
-                       answer='Apple', timestamp=125)
-            ],
-        ), updates)
+            Update(
+                answer=Answer(quiz_id='test', question=2, team_id=5002,
+                              answer='Apple', timestamp=125)
+            ),
+        ], updates)
 
 
 if __name__ == '__main__':

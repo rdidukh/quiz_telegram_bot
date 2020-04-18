@@ -2,6 +2,7 @@ import contextlib
 from datetime import datetime
 from dataclasses import dataclass, field
 import sqlite3
+import threading
 from typing import List, Optional
 
 
@@ -36,6 +37,7 @@ class Team:
 class QuizDb:
     def __init__(self, *, db_path: str):
         self.db_path = db_path
+        self.lock = threading.RLock()
         self.create_if_not_exists()
 
     def get_answers(self, quiz_id: str, *, update_id_greater_than: int = 0) -> List[Answer]:
@@ -57,7 +59,7 @@ class QuizDb:
         return answers
 
     def update_answer(self, *, quiz_id: str, question: int, team_id: int, answer: str, answer_time: int) -> int:
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 (timestamp,) = db.execute('SELECT timestamp '
                                           'FROM answers '
@@ -84,7 +86,7 @@ class QuizDb:
     def insert_message(self, message: Message):
         insert_timestamp = message.insert_timestamp or int(
             datetime.utcnow().timestamp())
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 db.execute('''INSERT INTO messages
                            (insert_timestamp, timestamp, update_id, chat_id, text)
@@ -108,7 +110,7 @@ class QuizDb:
         return messages
 
     def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 (timestamp,) = db.execute('SELECT timestamp FROM teams WHERE quiz_id = ? AND id = ?',
                                           (quiz_id, team_id)).fetchone() or (0,)
@@ -165,11 +167,16 @@ class QuizDb:
         db.execute('UPDATE counters SET next_update_id = next_update_id + 1')
         return update_id
 
+    def increment_update_id_counter(self) -> int:
+        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                return self._increment_update_id_counter(db)
+
     def create_if_not_exists(self):
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 db.execute('''CREATE TABLE IF NOT EXISTS teams (
-                    update_id INT NOT NULL,
+                    update_id INTEGER NOT NULL,
                     quiz_id TEXT NOT NULL,
                     id INTEGER NOT NULL,
                     name TEXT NOT NULL,
@@ -178,7 +185,7 @@ class QuizDb:
                 db.execute('''CREATE TABLE IF NOT EXISTS answers (
                     update_id INTEGER NOT NULL,
                     quiz_id TEXT NOT NULL,
-                    question INT NOT NULL,
+                    question INTEGER NOT NULL,
                     team_id INTEGER NOT NULL,
                     answer TEXT NOT NULL,
                     timestamp INTEGER NOT NULL,

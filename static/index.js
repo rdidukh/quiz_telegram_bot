@@ -17,12 +17,12 @@ function addTableRow(table, values) {
 function updateStatusTable(status) {
     var table = document.getElementById('status')
     table.innerHTML = ''
-    addTableRow(table, ["OK", status.ok])
-    addTableRow(table, ["Quiz", status.quiz_id])
-    addTableRow(table, ["Question", status.question_id])
-    addTableRow(table, ["Registration", status.is_registration])
-    addTableRow(table, ["Language", status.language])
-    addTableRow(table, ["Last updated", new Date()])
+    addTableRow(table, ['OK', status.ok])
+    addTableRow(table, ['Quiz', status.quiz_id])
+    addTableRow(table, ['Question', status.question_id])
+    addTableRow(table, ['Registration', status.is_registration])
+    addTableRow(table, ['Language', status.language])
+    addTableRow(table, ['Last updated', new Date()])
 }
 
 function updateTeamsTable(status) {
@@ -60,11 +60,11 @@ function updateAnswersTable(status) {
         }
         startButton.style.border = '1px solid black'
         startButton.onclick = () => {
-            sendCommand("startQuestion", { "question_id": question_id }).then((response) => {
-                console.log("Question '" + question_id + "' started!")
+            sendCommand('startQuestion', { 'question_id': question_id }).then((response) => {
+                console.log('Question ' + question_id + started!')
             }).catch((error) => {
-                console.warn("Could not start question: " + error)
-            });
+                    console.warn('Could not start question: ' + error)
+                });
         }
 
         addTableRow(table, [startButton, question_id].concat(answers))
@@ -72,17 +72,17 @@ function updateAnswersTable(status) {
 }
 
 async function sendCommand(command, args) {
-    const response = await fetch("/api/" + command, {
-        method: "POST",
+    const response = await fetch('/api/' + command, {
+        method: 'POST',
         body: JSON.stringify(args),
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
     })
 
     text = await response.text()
 
     try {
         data = JSON.parse(text)
-    } catch(e) {
+    } catch (e) {
         console.error('Response is not a valid JSON object.')
         console.log(text)
         throw 'Response is not a valid JSON object.'
@@ -100,9 +100,9 @@ function getStatus() {
         updateTeamsTable(response)
         updateAnswersTable(response)
 
-        startRegistrationButton = document.getElementById("start_registration_button")
-        stopRegistrationButton = document.getElementById("stop_registration_button")
-        stopQuestionButton = document.getElementById("stop_question_button")
+        startRegistrationButton = document.getElementById('start_registration_button')
+        stopRegistrationButton = document.getElementById('stop_registration_button')
+        stopQuestionButton = document.getElementById('stop_question_button')
 
         if (response.is_registration) {
             startRegistrationButton.style.backgroundColor = null
@@ -118,20 +118,20 @@ function getStatus() {
             stopQuestionButton.style.backgroundColor = null
         }
     }).catch((error) => {
-        console.log("Could not get status: " + error)
+        console.log('Could not get status: ' + error)
     });
 }
 
 function startRegistration() {
-    sendCommand("startRegistration", {}).then((response) => {
-        console.log("Registration started!")
+    sendCommand('startRegistration', {}).then((response) => {
+        console.log('Registration started!')
     }).catch((error) => {
-        console.warn("Could not start registration: " + error)
+        console.warn('Could not start registration: ' + error)
     });
 }
 
 function stopRegistration() {
-    sendCommand("stopRegistration", {}).then((response) => {
+    sendCommand('stopRegistration', {}).then((response) => {
         console.log('Registration stopped!')
     }).catch((error) => {
         console.warn('Could not stop registration: ' + error)
@@ -139,11 +139,41 @@ function stopRegistration() {
 }
 
 function stopQuestion() {
-    sendCommand("stopQuestion", {}).then((response) => {
-        console.log("Question stopped!")
+    sendCommand('stopQuestion', {}).then((response) => {
+        console.log('Question stopped!')
     }).catch((error) => {
-        console.warn("Could not stop question: " + error)
+        console.warn('Could not stop question: ' + error)
     });
+}
+
+var lastSeenUpdateId = 0
+var status = null
+
+function handleUpdates(updates) {
+    if (updates.status) {
+        status = updates.status
+        // TODO: update status table.
+    }
+
+    for (const team of updates.teams) {
+        // TODO: update teams index.
+        // TODO: update teams table.
+    }
+
+    for (const answer of updates.answers) {
+        // TODO: update answers index.
+        // TODO: update answers table.
+    }
+}
+
+function getUpdates() {
+    sendCommand('getUpdates', {
+        'update_id_greater_than': lastSeenUpdateId
+    }).then((response) => {
+        handleUpdates(updates)
+    }).catch((error) => {
+        console.warning('Could not get updates: ' + error)
+    })
 }
 
 function onLoad() {

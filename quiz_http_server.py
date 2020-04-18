@@ -1,11 +1,11 @@
 import json
 import logging
-from telegram_quiz import TelegramQuiz, TelegramQuizError, Updates
+from telegram_quiz import TelegramQuiz, TelegramQuizError, Update
 import tornado.httpserver
 import tornado.ioloop
 import tornado.netutil
 import tornado.web
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 class RootHandler(tornado.web.RequestHandler):
@@ -55,20 +55,21 @@ class GetStatusApiHandler(BaseQuizRequestHandler):
             'teams': self.quiz.teams,
             'answers': self.quiz.answers,
             'question_set': sorted(list(self.quiz.question_set)),
-            "number_of_questions": self.quiz.number_of_questions,
-            "language": self.quiz.language,
+            'number_of_questions': self.quiz.number_of_questions,
+            'language': self.quiz.language,
             'question_id': self.quiz.question_id,
             'is_registration': self.quiz.is_registration()
         }
 
 
 class GetUpdatesApiHandler(BaseQuizRequestHandler):
-    def _updates_to_json(self, updates: Updates) -> Dict[str, Any]:
-        return {
-            'status': updates.status.__dict__,
-            'teams': [t.__dict__ for t in updates.teams],
-            'answers': [a.__dict__ for a in updates.answers],
-        }
+    def _update_to_json(self, update: Update) -> Dict[str, Any]:
+        result = {'update_id': update.update_id}
+        for field_name in ('status', 'team', 'answer'):
+            field = getattr(update, field_name)
+            if field:
+                result[field_name] = field.__dict__
+        return result
 
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         update_id_greater_than = request.get('update_id_greater_than')
@@ -78,7 +79,7 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
             return {'error': 'Parameter update_id_greater_than must be integer.'}
         updates = self.quiz.get_updates(
             update_id_greater_than=update_id_greater_than)
-        return self._updates_to_json(updates)
+        return {'updates': [self._update_to_json(u) for u in updates]}
 
 
 class StartRegistrationApiHandler(BaseQuizRequestHandler):

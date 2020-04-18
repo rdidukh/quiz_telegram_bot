@@ -2,12 +2,12 @@ import json
 import os
 from quiz_db import Answer, Team, QuizDb
 from quiz_http_server import create_quiz_tornado_app
-from telegram_quiz import QuizStatus, Updates, TelegramQuiz
+from telegram_quiz import QuizStatus, Update, TelegramQuiz
 from telegram_quiz_test import STRINGS
 import tempfile
 import tornado.testing
 import telegram
-from typing import Any, Dict
+from typing import Any, Dict, List
 import unittest
 
 
@@ -16,11 +16,14 @@ def _remove_key(d: Dict, key) -> Dict:
     return d
 
 
-def _json_to_updates(obj: Dict[str, Any]) -> Updates:
-    status = QuizStatus(**obj.get('status'))
-    teams = [Team(**t) for t in obj['teams']]
-    answers = [Answer(**a) for a in obj['answers']]
-    return Updates(status=status, teams=teams, answers=answers)
+def _json_to_updates(obj: Dict[str, Any]) -> List[Update]:
+    updates = obj['updates']
+    return [Update(
+        update_id=u['update_id'],
+        status=QuizStatus(**u['status']) if 'status' in u else None,
+        team=Team(**u['team']) if 'team' in u else None,
+        answer=Answer(**u['answer']) if 'answer' in u else None,
+    ) for u in updates]
 
 
 class BaseTestCase(tornado.testing.AsyncHTTPTestCase):
@@ -170,23 +173,28 @@ class GetUpdatesApiTest(BaseTestCase):
                               body='{"update_id_greater_than": 0}')
         updates = _json_to_updates(json.loads(response.body))
         self.assertEqual(200, response.code)
-        self.assertEqual(
-            Updates(
+        self.assertListEqual([
+            Update(
                 status=QuizStatus(quiz_id='test', number_of_questions=4,
-                                  language='lang', question=None, registration=False),
-                teams=[
-                    Team(quiz_id='test', id=5001,
-                         name='Unicode Юнікод 😎', timestamp=1),
-                    Team(quiz_id='test', id=5002,
-                         name='Liverpool', timestamp=2),
-                ],
-                answers=[
-                    Answer(quiz_id='test', question=1, team_id=5001,
-                           answer='Apple', timestamp=123),
-                    Answer(quiz_id='test', question=4, team_id=5002,
-                           answer='Banana', timestamp=121),
-                ],
-            ), updates)
+                                  language='lang', question=None, registration=False)
+            ),
+            Update(
+                team=Team(quiz_id='test', id=5001,
+                          name='Unicode Юнікод 😎', timestamp=1)
+            ),
+            Update(
+                team=Team(quiz_id='test', id=5002,
+                          name='Liverpool', timestamp=2),
+            ),
+            Update(
+                answer=Answer(quiz_id='test', question=1, team_id=5001,
+                              answer='Apple', timestamp=123),
+            ),
+            Update(
+                answer=Answer(quiz_id='test', question=4, team_id=5002,
+                              answer='Banana', timestamp=121),
+            ),
+        ], updates)
 
     def test_no_update_id_given(self):
         response = self.fetch('/api/getUpdates', method='POST', body='{}')
