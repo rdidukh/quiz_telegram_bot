@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from datetime import datetime
 import json
 import logging
 from quiz_db import Answer, Message, QuizDb, Team
@@ -271,17 +270,3 @@ class TelegramQuiz:
 
     def stop(self):
         self.updater.stop()
-
-    def get_updates(self, update_id_greater_than: int) -> Updates:
-        status = QuizStatus(quiz_id=self.id,
-                            number_of_questions=self.number_of_questions,
-                            language=self.language,
-                            question=int(
-                                self.question_id) if self.question_id else None,
-                            registration=bool(self.registration_handler),
-                            time=datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
-        teams = self.quiz_db.get_teams(
-            quiz_id=self.id, update_id_greater_than=update_id_greater_than)
-        answers = self.quiz_db.get_answers(
-            quiz_id=self.id, update_id_greater_than=update_id_greater_than)
-        return Updates(status=status, teams=teams, answers=answers)

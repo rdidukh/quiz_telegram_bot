@@ -71,14 +71,12 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
         }
 
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        update_id_greater_than = request.get('update_id_greater_than')
-        if update_id_greater_than is None:
-            return {'error': 'Parameter update_id_greater_than was not provided.'}
-        if not isinstance(update_id_greater_than, int):
-            return {'error': 'Parameter update_id_greater_than must be integer.'}
-        updates = self.quiz.get_updates(
-            update_id_greater_than=update_id_greater_than)
-        return self._updates_to_json(updates)
+        min_update_id = request.get('min_update_id')
+        if min_update_id is None:
+            return {'error': 'Parameter min_update_id was not provided.'}
+        if not isinstance(min_update_id, int):
+            return {'error': 'Parameter min_update_id must be integer.'}
+        return {}
 
 
 class StartRegistrationApiHandler(BaseQuizRequestHandler):

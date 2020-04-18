@@ -167,26 +167,9 @@ class GetUpdatesApiTest(BaseTestCase):
             quiz_id='ignored', question=2, team_id=5001, answer='Avocado', answer_time=125)
 
         response = self.fetch('/api/getUpdates', method='POST',
-                              body='{"update_id_greater_than": 0}')
-        updates = _json_to_updates(json.loads(response.body))
+                              body='{"min_update_id": 0}')
         self.assertEqual(200, response.code)
-        self.assertEqual(
-            Updates(
-                status=QuizStatus(quiz_id='test', number_of_questions=4,
-                                  language='lang', question=None, registration=False),
-                teams=[
-                    Team(quiz_id='test', id=5001,
-                         name='Unicode Юнікод 😎', timestamp=1),
-                    Team(quiz_id='test', id=5002,
-                         name='Liverpool', timestamp=2),
-                ],
-                answers=[
-                    Answer(quiz_id='test', question=1, team_id=5001,
-                           answer='Apple', timestamp=123),
-                    Answer(quiz_id='test', question=4, team_id=5002,
-                           answer='Banana', timestamp=121),
-                ],
-            ), updates)
+        self.assertDictEqual({}, json.loads(response.body))
 
     def test_no_update_id_given(self):
         response = self.fetch('/api/getUpdates', method='POST', body='{}')
@@ -195,7 +178,7 @@ class GetUpdatesApiTest(BaseTestCase):
 
     def test_update_id_is_not_int(self):
         response = self.fetch('/api/getUpdates', method='POST',
-                              body='{"update_id_greater_than": "0"}')
+                              body='{"min_update_id": "0"}')
         self.assertEqual(400, response.code)
         self.assertIn('error', json.loads(response.body))
 

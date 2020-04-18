@@ -2,6 +2,7 @@ import contextlib
 from datetime import datetime
 from dataclasses import dataclass, field
 import sqlite3
+import threading
 from typing import List, Optional
 
 
@@ -36,16 +37,17 @@ class Team:
 class QuizDb:
     def __init__(self, *, db_path: str):
         self.db_path = db_path
+        self.lock = threading.RLock()
         self.create_if_not_exists()
 
-    def get_answers(self, quiz_id: str, *, update_id_greater_than: int = 0) -> List[Answer]:
+    def get_answers(self, quiz_id: str, *, min_update_id: int = 0) -> List[Answer]:
         answers: List[Answer] = []
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 cursor = db.execute(
                     'SELECT update_id, quiz_id, question, team_id, answer, timestamp FROM answers '
-                    'WHERE quiz_id = ? AND update_id > ?',
-                    (quiz_id, update_id_greater_than))
+                    'WHERE quiz_id = ? AND update_id >= ?',
+                    (quiz_id, min_update_id))
 
                 for (update_id, quiz_id, question, team_id, answer, timestamp) in cursor:
                     answers.append(Answer(update_id=update_id,
@@ -57,29 +59,88 @@ class QuizDb:
         return answers
 
     def update_answer(self, *, quiz_id: str, question: int, team_id: int, answer: str, answer_time: int) -> int:
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
-                (timestamp,) = db.execute('SELECT timestamp '
-                                          'FROM answers '
-                                          'WHERE quiz_id = ? AND question = ? AND team_id = ?',
-                                          (quiz_id, question, team_id)).fetchone() or (0,)
+                (update_id, timestamp,) = db.execute('SELECT update_id, timestamp '
+                                                     'FROM answers '
+                                                     'WHERE quiz_id = ? AND question = ? AND team_id = ?',
+                                                     (quiz_id, question, team_id)).fetchone() or (0, 0)
 
+                # Don't update the answer if it's older than the current one.
                 if timestamp > answer_time:
                     return 0
 
-                update_id = self._increment_update_id_counter(db)
+                (last_update_id,) = db.execute(
+                    'SELECT MAX(update_id) FROM answers').fetchone()
+                new_update_id = (last_update_id or 0) + 1
 
-                if timestamp:
+                if update_id:
                     db.execute('UPDATE answers '
                                'SET update_id = ?, answer = ?, timestamp = ? '
-                               'WHERE quiz_id = ? AND question = ? AND team_id = ?',
-                               (update_id, answer, answer_time, quiz_id, question, team_id))
+                               'WHERE update_id = ?',
+                               (new_update_id, answer, answer_time, update_id))
                 else:
                     db.execute('INSERT INTO answers (update_id, quiz_id, question, team_id, answer, timestamp) '
                                'VALUES (?, ?, ?, ?, ?, ?)',
-                               (update_id, quiz_id, question, team_id, answer, answer_time))
+                               (new_update_id, quiz_id, question, team_id, answer, answer_time))
 
-                return update_id
+                return new_update_id
+
+    def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:
+        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                (update_id, timestamp) = db.execute('SELECT update_id, timestamp FROM teams WHERE quiz_id = ? AND id = ?',
+                                                    (quiz_id, team_id)).fetchone() or (0, 0)
+                if timestamp > registration_time:
+                    return 0
+
+                (last_update_id,) = db.execute(
+                    'SELECT MAX(update_id) FROM teams').fetchone()
+                new_update_id = (last_update_id or 0) + 1
+
+                if update_id:
+                    db.execute('UPDATE teams SET update_id = ?, name = ?, timestamp = ? WHERE update_id = ?',
+                               (new_update_id, name, registration_time, update_id))
+                else:
+                    db.execute('INSERT INTO teams'
+                               '(update_id, quiz_id, id, name, timestamp)'
+                               'VALUES (?, ?, ?, ?, ?)',
+                               (new_update_id, quiz_id, team_id, name, registration_time))
+                return new_update_id
+
+    def get_teams(self, *, quiz_id: str, team_id: Optional[int] = None, min_update_id: int = 0) -> List[Team]:
+        conditions = []
+        params = []
+
+        if quiz_id:
+            conditions.append('quiz_id = ?')
+            params.append(quiz_id)
+
+        if min_update_id:
+            conditions.append('update_id >= ?')
+            params.append(min_update_id)
+
+        if team_id is not None:
+            conditions.append('id = ?')
+            params.append(team_id)
+
+        condition = 'WHERE ' + ' AND '.join(conditions) if conditions else ''
+
+        teams: List[Team] = []
+        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                cursor = db.execute('SELECT update_id, quiz_id, id, name, timestamp '
+                                    f'FROM teams {condition} '
+                                    'GROUP BY id', params)
+                for (update_id, quiz_id, id, name, timestamp) in cursor:
+                    teams.append(Team(
+                        update_id=update_id,
+                        quiz_id=quiz_id,
+                        id=id,
+                        name=name,
+                        timestamp=timestamp
+                    ))
+        return teams
 
     def insert_message(self, message: Message):
         insert_timestamp = message.insert_timestamp or int(
@@ -107,78 +168,20 @@ class QuizDb:
                     messages.append(message)
         return messages
 
-    def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
-            with db:
-                (timestamp,) = db.execute('SELECT timestamp FROM teams WHERE quiz_id = ? AND id = ?',
-                                          (quiz_id, team_id)).fetchone() or (0,)
-                if timestamp > registration_time:
-                    return 0
-                update_id = self._increment_update_id_counter(db)
-
-                if timestamp:
-                    db.execute('UPDATE teams SET update_id = ?, name = ?, timestamp = ? WHERE quiz_id = ? AND id = ?',
-                               (update_id, name, registration_time, quiz_id, team_id))
-                else:
-                    db.execute('INSERT INTO teams'
-                               '(update_id, quiz_id, id, name, timestamp)'
-                               'VALUES (?, ?, ?, ?, ?)',
-                               (update_id, quiz_id, team_id, name, registration_time))
-                return update_id
-
-    def get_teams(self, *, quiz_id: str, team_id: Optional[int] = None, update_id_greater_than: int = 0) -> List[Team]:
-        conditions = []
-        params = []
-
-        if quiz_id:
-            conditions.append('quiz_id = ?')
-            params.append(quiz_id)
-
-        if update_id_greater_than:
-            conditions.append('update_id > ?')
-            params.append(update_id_greater_than)
-
-        if team_id is not None:
-            conditions.append('id = ?')
-            params.append(team_id)
-
-        condition = 'WHERE ' + ' AND '.join(conditions) if conditions else ''
-
-        teams: List[Team] = []
-        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
-            with db:
-                cursor = db.execute('SELECT update_id, quiz_id, id, name, timestamp '
-                                    f'FROM teams {condition} '
-                                    'GROUP BY id', params)
-                for (update_id, quiz_id, id, name, timestamp) in cursor:
-                    teams.append(Team(
-                        update_id=update_id,
-                        quiz_id=quiz_id,
-                        id=id,
-                        name=name,
-                        timestamp=timestamp
-                    ))
-        return teams
-
-    def _increment_update_id_counter(self, db: sqlite3.Connection) -> int:
-        (update_id,) = db.execute('SELECT next_update_id FROM counters').fetchone()
-        db.execute('UPDATE counters SET next_update_id = next_update_id + 1')
-        return update_id
-
     def create_if_not_exists(self):
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 db.execute('''CREATE TABLE IF NOT EXISTS teams (
-                    update_id INT NOT NULL,
+                    update_id INTEGER PRIMARY KEY NOT NULL,
                     quiz_id TEXT NOT NULL,
                     id INTEGER NOT NULL,
                     name TEXT NOT NULL,
                     timestamp INTEGER NOT NULL,
                     UNIQUE(quiz_id, id))''')
                 db.execute('''CREATE TABLE IF NOT EXISTS answers (
-                    update_id INTEGER NOT NULL,
+                    update_id INTEGER PRIMARY KEY NOT NULL,
                     quiz_id TEXT NOT NULL,
-                    question INT NOT NULL,
+                    question INTEGER NOT NULL,
                     team_id INTEGER NOT NULL,
                     answer TEXT NOT NULL,
                     timestamp INTEGER NOT NULL,
@@ -189,8 +192,3 @@ class QuizDb:
                     update_id INTEGER NOT NULL,
                     chat_id INTEGER NOT NULL,
                     text TEXT NOT NULL)''')
-                db.execute('''CREATE TABLE IF NOT EXISTS counters (
-                    next_update_id INTEGER
-                )''')
-                db.execute(
-                    'INSERT OR IGNORE INTO counters (rowid, next_update_id) VALUES (1, 1)')

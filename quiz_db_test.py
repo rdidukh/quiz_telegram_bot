@@ -45,19 +45,17 @@ class BaseTestCase(unittest.TestCase):
                 db.executemany('INSERT INTO teams '
                                'VALUES (:update_id, :quiz_id, :id, :name, :timestamp)', values)
 
-    def _select_update_id(self):
-        with sqlite3.connect(self.db_path) as db:
-            with db:
-                return db.execute('SELECT next_update_id FROM counters').fetchall()
-
-    def _update_update_id(self, value: int):
-        with sqlite3.connect(self.db_path) as db:
-            with db:
-                return db.execute('UPDATE counters SET next_update_id = ?', (value,))
-
     def _select_messages(self):
         with sqlite3.connect(self.db_path) as db:
             return db.execute('SELECT insert_timestamp, timestamp, update_id, chat_id, text FROM messages').fetchall()
+
+    def _get_last_answers_update_id(self):
+        with sqlite3.connect(self.db_path) as db:
+            return db.execute('SELECT MAX(update_id) FROM answers').fetchone()[0] or 0
+
+    def _get_last_teams_update_id(self):
+        with sqlite3.connect(self.db_path) as db:
+            return db.execute('SELECT MAX(update_id) FROM teams').fetchone()[0] or 0
 
 
 class QuizDbTest(BaseTestCase):
@@ -110,7 +108,7 @@ class QuizDbTest(BaseTestCase):
     def test_get_teams_by_update_id(self):
         self._insert_into_teams(_INITIAL_TEAMS)
         teams = self.quiz_db.get_teams(
-            quiz_id='test', update_id_greater_than=2)
+            quiz_id='test', min_update_id=3)
 
         self.assertListEqual(sorted([
             Team(update_id=4, quiz_id='test', id=5000,
@@ -118,7 +116,7 @@ class QuizDbTest(BaseTestCase):
         ]), sorted(teams))
 
         teams = self.quiz_db.get_teams(
-            quiz_id='test', update_id_greater_than=3)
+            quiz_id='test', min_update_id=4)
 
         self.assertListEqual(sorted([
             Team(update_id=4, quiz_id='test', id=5000,
@@ -126,49 +124,52 @@ class QuizDbTest(BaseTestCase):
         ]), sorted(teams))
 
         teams = self.quiz_db.get_teams(
-            quiz_id='test', update_id_greater_than=4)
+            quiz_id='test', min_update_id=5)
         self.assertListEqual(sorted([]), sorted(teams))
 
     def test_update_answer(self):
-        self._update_update_id(100)
+        prev_update_id = self._get_last_answers_update_id()
         update_id = self.quiz_db.update_answer(quiz_id='test', question=3, team_id=5001,
                                                answer='Unicode Юнікод 😎', answer_time=123)
 
-        self.assertEqual(100, update_id)
+        self.assertEqual(prev_update_id+1, update_id)
         self.assertListEqual([
-            (100, 'test', 3, 5001, 'Unicode Юнікод 😎', 123),
+            (update_id, 'test', 3, 5001, 'Unicode Юнікод 😎', 123),
         ], self._select_answers())
-        self.assertListEqual([(101,)], self._select_update_id())
+        self.assertEqual(update_id, self._get_last_answers_update_id())
 
+        prev_update_id = self._get_last_answers_update_id()
         update_id = self.quiz_db.update_answer(quiz_id='other', question=12, team_id=5002,
                                                answer='Apple', answer_time=321)
 
-        self.assertEqual(101, update_id)
+        self.assertEqual(prev_update_id+1, update_id)
         self.assertListEqual([
-            (100, 'test', 3, 5001, 'Unicode Юнікод 😎', 123),
-            (101, 'other', 12, 5002, 'Apple', 321),
+            (prev_update_id, 'test', 3, 5001, 'Unicode Юнікод 😎', 123),
+            (update_id, 'other', 12, 5002, 'Apple', 321),
         ], self._select_answers())
-        self.assertListEqual([(102,)], self._select_update_id())
+        self.assertEqual(update_id, self._get_last_answers_update_id())
 
+        prev_update_id = self._get_last_answers_update_id()
         update_id = self.quiz_db.update_answer(quiz_id='test', question=3, team_id=5001,
                                                answer='Banana', answer_time=124)
 
-        self.assertEqual(102, update_id)
+        self.assertEqual(update_id, update_id)
         self.assertListEqual([
-            (102, 'test', 3, 5001, 'Banana', 124),
-            (101, 'other', 12, 5002, 'Apple', 321),
+            (prev_update_id, 'other', 12, 5002, 'Apple', 321),
+            (update_id, 'test', 3, 5001, 'Banana', 124),
         ], self._select_answers())
-        self.assertListEqual([(103,)], self._select_update_id())
+        self.assertEqual(update_id, self._get_last_answers_update_id())
 
+        prev_update_id = self._get_last_answers_update_id()
         update_id = self.quiz_db.update_answer(quiz_id='test', question=3, team_id=5001,
                                                answer='Carrot', answer_time=123)
 
         self.assertEqual(0, update_id)
         self.assertListEqual([
-            (102, 'test', 3, 5001, 'Banana', 124),
-            (101, 'other', 12, 5002, 'Apple', 321),
+            (prev_update_id-1, 'other', 12, 5002, 'Apple', 321),
+            (prev_update_id, 'test', 3, 5001, 'Banana', 124),
         ], self._select_answers())
-        self.assertListEqual([(103,)], self._select_update_id())
+        self.assertEqual(prev_update_id, self._get_last_answers_update_id())
 
     def test_get_answers(self):
         self._insert_into_answers([
@@ -176,7 +177,7 @@ class QuizDbTest(BaseTestCase):
                  answer='Apple', timestamp=123),
             dict(update_id=3, quiz_id='ignored', question=5, team_id=5001,
                  answer='Ignored', timestamp=321),
-            dict(update_id=3, quiz_id='test', question=9, team_id=5002,
+            dict(update_id=4, quiz_id='test', question=9, team_id=5002,
                  answer='Unicode Юнікод 😎', timestamp=34),
         ])
         answers = self.quiz_db.get_answers('test')
@@ -188,7 +189,7 @@ class QuizDbTest(BaseTestCase):
                    answer='Apple', timestamp=123),
         ]), sorted(answers))
 
-        answers = self.quiz_db.get_answers('test', update_id_greater_than=2)
+        answers = self.quiz_db.get_answers('test', min_update_id=3)
         self.assertListEqual(sorted([
             Answer(quiz_id='test', question=9, team_id=5002,
                    answer='Unicode Юнікод 😎', timestamp=34),
@@ -197,37 +198,38 @@ class QuizDbTest(BaseTestCase):
 
 class UpdateTeamTest(BaseTestCase):
     def test_inserts_new_team(self):
+        prev_update_id = self._get_last_teams_update_id()
+
         update_id = self.quiz_db.update_team(
             quiz_id='test', team_id=5001, name='Unicode Юнікод 😎', registration_time=123)
 
-        self.assertEqual(1, update_id)
+        self.assertEqual(prev_update_id+1, update_id)
         self.assertListEqual([
-            (1, 'test', 5001, 'Unicode Юнікод 😎', 123),
+            (update_id, 'test', 5001, 'Unicode Юнікод 😎', 123),
         ], self._select_teams())
-        self.assertListEqual([(2,)], self._select_update_id())
+        self.assertEqual(update_id, self._get_last_teams_update_id())
 
     def test_updates_team(self):
-        self._update_update_id(100)
         self._insert_into_teams([
             dict(update_id=1, quiz_id='test',
                  id=5001, name='Apple', timestamp=12)
         ])
+        prev_update_id = self._get_last_teams_update_id()
 
         update_id = self.quiz_db.update_team(
             quiz_id='test', team_id=5001, name='Banana', registration_time=13)
 
-        self.assertEqual(100, update_id)
+        self.assertEqual(prev_update_id+1, update_id)
         self.assertListEqual([
-            (100, 'test', 5001, 'Banana', 13),
+            (update_id, 'test', 5001, 'Banana', 13),
         ], self._select_teams())
-        self.assertListEqual([(101,)], self._select_update_id())
 
     def test_outdated_registration(self):
-        self._update_update_id(100)
         self._insert_into_teams([
             dict(update_id=1, quiz_id='test',
                  id=5001, name='Apple', timestamp=12)
         ])
+        prev_update_id = self._get_last_teams_update_id()
 
         update_id = self.quiz_db.update_team(
             quiz_id='test', team_id=5001, name='Banana', registration_time=11)
@@ -236,7 +238,7 @@ class UpdateTeamTest(BaseTestCase):
         self.assertListEqual([
             (1, 'test', 5001, 'Apple', 12),
         ], self._select_teams())
-        self.assertListEqual([(100,)], self._select_update_id())
+        self.assertEqual(prev_update_id, self._get_last_teams_update_id())
 
 
 if __name__ == '__main__':
