@@ -104,12 +104,9 @@ class StopQuestionTest(BaseTestCase):
     def test_stops_question(self):
         self.quiz.start_question(question_id='01')
         update_id = self.quiz.status_update_id
-        print(f'UPDATE_ID 1: {update_id}')
         self.quiz.stop_question()
         self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
         self.assertIsNone(self.quiz.question_id)
-        print(f'UPDATE_ID 2: {update_id}')
-        print(f'UPDATE_ID 2: {self.quiz.status_update_id}')
         self.assertGreater(self.quiz.status_update_id, update_id)
 
     def test_stop_question_twice_raises(self):

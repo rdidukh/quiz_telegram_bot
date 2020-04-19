@@ -9,6 +9,7 @@ import tornado.testing
 import telegram
 from typing import Any, Dict
 import unittest
+from unittest.mock import MagicMock
 
 
 def _remove_key(d: Dict, key) -> Dict:
@@ -155,30 +156,151 @@ class TestQuizHttpServer(BaseTestCase):
 
 class GetUpdatesApiTest(BaseTestCase):
     def test_returns_updates(self):
-        self.quiz_db.update_team(
-            quiz_id='test', team_id=5001, name='Unicode Юнікод 😎', registration_time=1)
-        self.quiz_db.update_team(
-            quiz_id='test', team_id=5002, name='Liverpool', registration_time=2)
-        self.quiz_db.update_answer(
-            quiz_id='test', question=1, team_id=5001, answer='Apple', answer_time=123)
-        self.quiz_db.update_answer(
-            quiz_id='test', question=4, team_id=5002, answer='Banana', answer_time=121)
-        self.quiz_db.update_answer(
-            quiz_id='ignored', question=2, team_id=5001, answer='Avocado', answer_time=125)
-
+        update_id = self.quiz.status_update_id
+        self.quiz.get_status = MagicMock(return_value=QuizStatus(
+            update_id=101,
+            quiz_id='test',
+            number_of_questions=19,
+            language='lang',
+            question=None,
+            registration=False,
+            time='2020-02-03 04:05:06',
+        ))
+        self.quiz.quiz_db.get_answers = MagicMock(return_value=[
+            Answer(quiz_id='test', question=5, team_id=5001,
+                   answer='Apple', timestamp=1234, update_id=201),
+            Answer(quiz_id='test', question=8, team_id=5002,
+                   answer='Unicode Юнікод', timestamp=1236, update_id=202),
+        ])
+        self.quiz.quiz_db.get_teams = MagicMock(return_value=[
+            Team(quiz_id='test', id=5001, name='Liverpool',
+                 timestamp=1235, update_id=301),
+            Team(quiz_id='test', id=5002, name='Tottenham',
+                 timestamp=1237, update_id=302),
+        ])
+        request = {
+            'min_status_update_id': update_id,
+            'min_teams_update_id': 456,
+            'min_answers_update_id': 789,
+        }
         response = self.fetch('/api/getUpdates', method='POST',
-                              body='{"min_update_id": 0}')
+                              body=json.dumps(request))
         self.assertEqual(200, response.code)
-        self.assertDictEqual({}, json.loads(response.body))
+        self.assertDictEqual({
+            'status': {
+                'update_id': 101,
+                'quiz_id': 'test',
+                'number_of_questions': 19,
+                'language': 'lang',
+                'question': None,
+                'registration': False,
+                'time': '2020-02-03 04:05:06'
+            },
+            'teams': [
+                dict(quiz_id='test', id=5001, name='Liverpool',
+                     timestamp=1235, update_id=301),
+                dict(quiz_id='test', id=5002, name='Tottenham',
+                     timestamp=1237, update_id=302),
+            ],
+            'answers': [
+                dict(quiz_id='test', question=5, team_id=5001,
+                     answer='Apple', timestamp=1234, update_id=201),
+                dict(quiz_id='test', question=8, team_id=5002,
+                     answer='Unicode Юнікод', timestamp=1236, update_id=202),
+            ],
+        }, json.loads(response.body))
+        self.quiz.get_status.assert_called_once()
+        self.quiz.quiz_db.get_teams.assert_called_with(
+            quiz_id='test', min_update_id=456)
+        self.quiz.quiz_db.get_answers.assert_called_with(
+            quiz_id='test', min_update_id=789)
 
-    def test_no_update_id_given(self):
-        response = self.fetch('/api/getUpdates', method='POST', body='{}')
+    def test_ignores_status(self):
+        update_id = self.quiz.status_update_id
+        self.quiz.get_status = MagicMock()
+        self.quiz.quiz_db.get_answers = MagicMock(return_value=[])
+        self.quiz.quiz_db.get_teams = MagicMock(return_value=[])
+        request = {
+            'min_status_update_id': update_id+1,
+            'min_teams_update_id': 456,
+            'min_answers_update_id': 789,
+        }
+        response = self.fetch('/api/getUpdates', method='POST',
+                              body=json.dumps(request))
+        self.assertEqual(200, response.code)
+        self.assertDictEqual({
+            'status': None,
+            'teams': [],
+            'answers': [],
+        }, json.loads(response.body))
+        self.quiz.get_status.assert_not_called()
+        self.quiz.quiz_db.get_teams.assert_called_with(
+            quiz_id='test', min_update_id=456)
+        self.quiz.quiz_db.get_answers.assert_called_with(
+            quiz_id='test', min_update_id=789)
+
+    def test_no_min_status_update_id_given(self):
+        request = {
+            'min_teams_update_id': 456,
+            'min_answers_update_id': 789,
+        }
+        response = self.fetch(
+            '/api/getUpdates', method='POST', body=json.dumps(request))
         self.assertEqual(400, response.code)
         self.assertIn('error', json.loads(response.body))
 
-    def test_update_id_is_not_int(self):
-        response = self.fetch('/api/getUpdates', method='POST',
-                              body='{"min_update_id": "0"}')
+    def test_no_min_teams_update_id_given(self):
+        request = {
+            'min_status_update_id': 123,
+            'min_answers_update_id': 789,
+        }
+        response = self.fetch(
+            '/api/getUpdates', method='POST', body=json.dumps(request))
+        self.assertEqual(400, response.code)
+        self.assertIn('error', json.loads(response.body))
+
+    def test_no_min_answers_update_id_given(self):
+        request = {
+            'min_status_update_id': 123,
+            'min_teams_update_id': 456,
+        }
+        response = self.fetch(
+            '/api/getUpdates', method='POST', body=json.dumps(request))
+        self.assertEqual(400, response.code)
+        self.assertIn('error', json.loads(response.body))
+
+###
+
+    def test_no_min_status_update_id_not_int(self):
+        request = {
+            'min_status_update_id': '123',
+            'min_teams_update_id': 456,
+            'min_answers_update_id': 789,
+        }
+        response = self.fetch(
+            '/api/getUpdates', method='POST', body=json.dumps(request))
+        self.assertEqual(400, response.code)
+        self.assertIn('error', json.loads(response.body))
+
+    def test_no_min_teams_update_id_not_int(self):
+        request = {
+            'min_status_update_id': 123,
+            'min_teams_update_id': '456',
+            'min_answers_update_id': 789,
+        }
+        response = self.fetch(
+            '/api/getUpdates', method='POST', body=json.dumps(request))
+        self.assertEqual(400, response.code)
+        self.assertIn('error', json.loads(response.body))
+
+    def test_no_min_answers_update_id_not_int(self):
+        request = {
+            'min_status_update_id': 123,
+            'min_teams_update_id': 456,
+            'min_answers_update_id': '789',
+        }
+        response = self.fetch(
+            '/api/getUpdates', method='POST', body=json.dumps(request))
         self.assertEqual(400, response.code)
         self.assertIn('error', json.loads(response.body))
 

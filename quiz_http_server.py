@@ -1,6 +1,6 @@
 import json
 import logging
-from telegram_quiz import TelegramQuiz, TelegramQuizError, Updates
+from telegram_quiz import TelegramQuiz, TelegramQuizError
 import tornado.httpserver
 import tornado.ioloop
 import tornado.netutil
@@ -63,20 +63,44 @@ class GetStatusApiHandler(BaseQuizRequestHandler):
 
 
 class GetUpdatesApiHandler(BaseQuizRequestHandler):
-    def _updates_to_json(self, updates: Updates) -> Dict[str, Any]:
-        return {
-            'status': updates.status.__dict__,
-            'teams': [t.__dict__ for t in updates.teams],
-            'answers': [a.__dict__ for a in updates.answers],
-        }
 
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        min_update_id = request.get('min_update_id')
-        if min_update_id is None:
-            return {'error': 'Parameter min_update_id was not provided.'}
-        if not isinstance(min_update_id, int):
-            return {'error': 'Parameter min_update_id must be integer.'}
-        return {}
+        min_status_update_id = request.get('min_status_update_id')
+        min_teams_update_id = request.get('min_teams_update_id')
+        min_answers_update_id = request.get('min_answers_update_id')
+
+        if not min_status_update_id:
+            return {'error': 'Parameter min_status_update_id must be provided.'}
+
+        if not min_teams_update_id:
+            return {'error': 'Parameter min_teams_update_id must be provided.'}
+
+        if not min_answers_update_id:
+            return {'error': 'Parameter min_answers_update_id must be provided.'}
+
+        if not isinstance(min_status_update_id, int):
+            return {'error': 'Parameter min_status_update_id must be integer.'}
+
+        if not isinstance(min_teams_update_id, int):
+            return {'error': 'Parameter min_teams_update_id must be integer.'}
+
+        if not isinstance(min_answers_update_id, int):
+            return {'error': 'Parameter min_answers_update_id must be integer.'}
+
+        if self.quiz.status_update_id >= min_status_update_id:
+            status = self.quiz.get_status()
+        else:
+            status = None
+        teams = self.quiz.quiz_db.get_teams(
+            quiz_id=self.quiz.id, min_update_id=min_teams_update_id)
+        answers = self.quiz.quiz_db.get_answers(
+            quiz_id=self.quiz.id, min_update_id=min_answers_update_id)
+
+        return {
+            'status': status.__dict__ if status else None,
+            'teams': [t.__dict__ for t in teams],
+            'answers': [a.__dict__ for a in answers],
+        }
 
 
 class StartRegistrationApiHandler(BaseQuizRequestHandler):
