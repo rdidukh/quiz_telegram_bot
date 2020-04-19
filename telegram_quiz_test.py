@@ -1,5 +1,5 @@
 from datetime import datetime
-from telegram_quiz import TelegramQuiz, TelegramQuizError
+from telegram_quiz import QuizStatus, TelegramQuiz, TelegramQuizError
 from quiz_db import Answer, Message, QuizDb, Team
 import tempfile
 import telegram
@@ -35,43 +35,94 @@ class BaseTestCase(unittest.TestCase):
         self.test_dir.cleanup()
 
 
-class TestTelegramQuiz(BaseTestCase):
-
-    def test_start_stop_registration(self):
+class StartRegistrationTest(BaseTestCase):
+    def test_starts_registration(self):
+        update_id = self.quiz.status_update_id
         self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
         self.quiz.start_registration()
         self.assertEqual(self.quiz._handle_registration_update,
                          self.quiz.updater.dispatcher.handlers[1][0].callback)
+        self.assertGreater(self.quiz.status_update_id, update_id)
 
+    def test_raises_when_starting_twice(self):
+        self.quiz.start_registration()
+        update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError, self.quiz.start_registration)
         self.assertEqual(self.quiz._handle_registration_update,
                          self.quiz.updater.dispatcher.handlers[1][0].callback)
+        self.assertEqual(update_id, self.quiz.status_update_id)
 
+    def test_raises_when_question_is_on(self):
+        self.quiz.start_question(question_id='01')
+        update_id = self.quiz.status_update_id
+        self.assertRaises(TelegramQuizError, self.quiz.start_registration)
+        self.assertEqual(update_id, self.quiz.status_update_id)
+
+
+class StopRegistrationTest(BaseTestCase):
+    def test_stops_registration(self):
+        self.quiz.start_registration()
+        update_id = self.quiz.status_update_id
         self.quiz.stop_registration()
         self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
+        self.assertGreater(self.quiz.status_update_id, update_id)
 
+    def test_raises_when_stopping_twice(self):
+        self.quiz.start_registration()
+        self.quiz.stop_registration()
+        update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError, self.quiz.stop_registration)
+        self.assertEqual(update_id, self.quiz.status_update_id)
 
-        self.quiz.start_question(question_id='01')
-        self.assertRaises(TelegramQuizError, self.quiz.start_registration)
 
-    def test_start_stop_question(self):
+class StartQuestionTest(BaseTestCase):
+    def test_starts_question(self):
+        update_id = self.quiz.status_update_id
         self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
         self.quiz.start_question(question_id='01')
         self.assertEqual(self.quiz._handle_answer_update,
                          self.quiz.updater.dispatcher.handlers[1][0].callback)
         self.assertEqual('01', self.quiz.question_id)
+        self.assertGreater(self.quiz.status_update_id, update_id)
 
+    def test_start_question_twice_raises(self):
+        self.quiz.start_question(question_id='01')
+        update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError,
                           self.quiz.start_question, question_id='01')
+        self.assertEqual(update_id, self.quiz.status_update_id)
 
+    def test_start_raises_when_registration_is_on(self):
+        self.quiz.start_registration()
+        update_id = self.quiz.status_update_id
+        self.assertRaises(TelegramQuizError,
+                          self.quiz.start_question, question_id='01')
+        self.assertEqual(update_id, self.quiz.status_update_id)
+
+
+class StopQuestionTest(BaseTestCase):
+    def test_stops_question(self):
+        self.quiz.start_question(question_id='01')
+        update_id = self.quiz.status_update_id
+        print(f'UPDATE_ID 1: {update_id}')
         self.quiz.stop_question()
         self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
         self.assertIsNone(self.quiz.question_id)
+        print(f'UPDATE_ID 2: {update_id}')
+        print(f'UPDATE_ID 2: {self.quiz.status_update_id}')
+        self.assertGreater(self.quiz.status_update_id, update_id)
 
-        self.assertRaises(TelegramQuizError, self.quiz.stop_question)
+    def test_stop_question_twice_raises(self):
+        self.quiz.start_question(question_id='01')
+        self.quiz.stop_question()
+        update_id = self.quiz.status_update_id
+        self.assertRaises(TelegramQuizError,
+                          self.quiz.stop_question)
+        self.assertEqual(update_id, self.quiz.status_update_id)
 
-    def test_handle_log_update(self):
+
+class HandleLogUpdateTest(BaseTestCase):
+    def test_logs_update(self):
         self.quiz_db.insert_message(
             Message(timestamp=1, update_id=2, chat_id=3, text='existing'))
 
@@ -260,6 +311,35 @@ class HandleAnswerUpdateTest(BaseTestCase):
                    team_id=5001, answer='Banana', timestamp=5),
         ], self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_not_called()
+
+
+class GetStatusTest(BaseTestCase):
+    def test_returns_status(self):
+        status = self.quiz.get_status()
+
+        self.assertEqual(
+            QuizStatus(
+                update_id=self.quiz.status_update_id,
+                quiz_id='test',
+                number_of_questions=2,
+                language='lang',
+                question=None,
+                registration=False,
+            ), status
+        )
+
+        self.assertIsInstance(status.time, str)
+        self.assertGreater(len(status.time), 0)
+
+    def test_registration(self):
+        self.quiz.start_registration()
+        status = self.quiz.get_status()
+        self.assertTrue(status.registration)
+
+    def test_question(self):
+        self.quiz.start_question('01')
+        status = self.quiz.get_status()
+        self.assertEqual(1, status.question)
 
 
 if __name__ == '__main__':

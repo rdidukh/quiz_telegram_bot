@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 import json
 import logging
 from quiz_db import Answer, Message, QuizDb, Team
@@ -21,6 +22,7 @@ class Strings:
 
 @dataclass
 class QuizStatus:
+    update_id: int
     quiz_id: str
     number_of_questions: int
     language: str
@@ -54,6 +56,8 @@ class TelegramQuiz:
         self.updater = telegram.ext.Updater(bot_token, use_context=True)
         self.language = language
         self.strings: Strings = self._get_strings(strings_file, language)
+        # Init with the number of milliseconds since 2020-01-01 00:00 UTC.
+        self._status_update_id = int(time.time()*1000) - 1577836800000
         # DEPRECATED: Used to support old tests.
         self._answers_for_testing = None
         self._teams_for_testing = None
@@ -156,6 +160,7 @@ class TelegramQuiz:
             telegram.ext.Filters.text, self._handle_registration_update)
         self.updater.dispatcher.add_handler(
             self.registration_handler, group=1)
+        self._on_status_update()
         logging.info(f'Registration for game "{self.id}" has started.')
 
     def stop_registration(self):
@@ -167,6 +172,7 @@ class TelegramQuiz:
         self.updater.dispatcher.remove_handler(
             self.registration_handler, group=1)
         self.registration_handler = None
+        self._on_status_update()
         logging.info(f'Registration for game "{self.id}" has ended.')
 
     def is_registration(self) -> bool:
@@ -224,6 +230,7 @@ class TelegramQuiz:
         self.updater.dispatcher.add_handler(
             self.question_handler, group=1)
         self.question_id = question_id
+        self._on_status_update()
         logging.info(
             f'Question "{question_id}" for game "{self.id}" has started.')
 
@@ -237,6 +244,7 @@ class TelegramQuiz:
             self.question_handler, group=1)
         self.question_id = None
         self.question_handler = None
+        self._on_status_update()
         logging.info(
             f'Question "{self.question_id}" for game "{self.id}" has ended.')
 
@@ -259,14 +267,33 @@ class TelegramQuiz:
         logging.info('Committing values to database done.')
 
     def _handle_error(self, update, context):
-        logging.error('Update "%s" caused error "%s"',
-                      update, context.error)
+        logging.error('Update "%s" caused error "%s"', update, context.error)
 
     def start(self):
         self.updater.dispatcher.add_error_handler(self._handle_error)
         self.updater.dispatcher.add_handler(telegram.ext.MessageHandler(
             telegram.ext.Filters.text, self._handle_log_update))
         self.updater.start_polling()
+        self._on_status_update()
 
     def stop(self):
         self.updater.stop()
+        self._on_status_update()
+
+    def _on_status_update(self):
+        self._status_update_id += 1
+
+    @property
+    def status_update_id(self) -> int:
+        return self._status_update_id
+
+    def get_status(self) -> QuizStatus:
+        return QuizStatus(
+            update_id=self._status_update_id,
+            quiz_id=self.id,
+            number_of_questions=self.number_of_questions,
+            language=self.language,
+            question=int(self.question_id) if self.question_id else None,
+            registration=bool(self.registration_handler),
+            time=datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+        )
