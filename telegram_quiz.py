@@ -224,7 +224,7 @@ class TelegramQuiz:
             logging.warning(f'Trying to start question "{question_id}" for game "{self.id}", '
                             f'but it is not in the question set.')
             raise TelegramQuizError(
-                f'Can not start question "{question_id}" which is not in the question set.')
+                f'Can not start question "{question_id}" which is not in the question set: {self.question_set}')
         self.question_handler = telegram.ext.MessageHandler(
             telegram.ext.Filters.text, self._handle_answer_update)
         self.updater.dispatcher.add_handler(

@@ -24,23 +24,49 @@
     </style>
 </head>
 
-<body onload="onLoad()">
+<body onload='onLoad()'>
     <h2>Status</h2>
-    <table id="status"></table>
+    <table id='status_table'>
+        <tr>
+            <td>Quiz</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Language</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Question</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Registration</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Last changed</td>
+            <td></td>
+        </tr>
+    </table>
+
+    <h2>Results</h2>
+    <table id='results_table'></table>
+
+    <table id='status'></table>
     <h2>Actions</h2>
-    <button class="action_button" id="start_registration_button" onclick="startRegistration()">Start registration</button>
-    <br/>
-    <button class="action_button" id="stop_registration_button" onclick="stopRegistration()">Stop registration</button>    
-    <br />    
-    <button class="action_button" id="stop_question_button" onclick="stopQuestion()">Stop question</button>
-    <br/>
-    <h2>Teams</h2>
-    <table id="teams"></table>
+    <button class='action_button' id='start_registration_button' onclick='api.startRegistration()'>Start
+        registration</button>
     <br />
+    <button class='action_button' id='stop_registration_button' onclick='api.stopRegistration()'>Stop
+        registration</button>
+    <br />
+    <button class='action_button' id='stop_question_button' onclick='api.stopQuestion()'>Stop question</button>
+    <br />
+
     <h2>Answers</h2>
-    <table id="answers"></table>
-    <br />
-    <script type="text/javascript" src="index.js"></script>
+    <table id='answers_table'></table>
+
+    <script type='text/javascript' src='index.js'></script>
 </body>
 
 </html>

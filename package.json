@@ -1,0 +1,11 @@
+{
+    "name": "telegram_quiz",
+    "version": "0.0.1",
+    "devDependencies": {
+        "jsdom": "^16.2.2",
+        "mocha": "^7.1.1"
+    },
+    "scripts": {
+        "test": "mocha ."
+    }
+}

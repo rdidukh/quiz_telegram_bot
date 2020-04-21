@@ -69,13 +69,13 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
         min_teams_update_id = request.get('min_teams_update_id')
         min_answers_update_id = request.get('min_answers_update_id')
 
-        if not min_status_update_id:
+        if min_status_update_id is None:
             return {'error': 'Parameter min_status_update_id must be provided.'}
 
-        if not min_teams_update_id:
+        if min_teams_update_id is None:
             return {'error': 'Parameter min_teams_update_id must be provided.'}
 
-        if not min_answers_update_id:
+        if min_answers_update_id is None:
             return {'error': 'Parameter min_answers_update_id must be provided.'}
 
         if not isinstance(min_status_update_id, int):
