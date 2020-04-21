@@ -3,7 +3,7 @@ from datetime import datetime
 from dataclasses import dataclass, field
 import sqlite3
 import threading
-from typing import List, Optional
+from typing import List, Tuple, Optional
 
 
 @dataclass
@@ -22,6 +22,7 @@ class Answer:
     team_id: int
     answer: str
     timestamp: int
+    points: Optional[int] = field(default=None)
     update_id: int = field(default=None, compare=False)
 
 
@@ -45,38 +46,45 @@ class QuizDb:
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 cursor = db.execute(
-                    'SELECT update_id, quiz_id, question, team_id, answer, timestamp FROM answers '
+                    'SELECT update_id, quiz_id, question, team_id, answer, timestamp, points FROM answers '
                     'WHERE quiz_id = ? AND update_id >= ?',
                     (quiz_id, min_update_id))
 
-                for (update_id, quiz_id, question, team_id, answer, timestamp) in cursor:
+                for (update_id, quiz_id, question, team_id, answer, timestamp, points) in cursor:
                     answers.append(Answer(update_id=update_id,
                                           quiz_id=quiz_id,
                                           question=question,
                                           team_id=team_id,
                                           answer=answer,
-                                          timestamp=timestamp))
+                                          timestamp=timestamp,
+                                          points=points))
         return answers
+
+    def _select_answer(self, *, db: sqlite3.Connection, quiz_id: str, question: int, team_id: int) -> Tuple[int, int]:
+        return db.execute('SELECT update_id, timestamp '
+                          'FROM answers '
+                          'WHERE quiz_id = ? AND question = ? AND team_id = ?',
+                          (quiz_id, question, team_id)).fetchone() or (0, 0)
+
+    def _get_next_answer_update_id(self, db: sqlite3.Connection) -> int:
+        (update_id,) = db.execute('SELECT MAX(update_id) FROM answers').fetchone()
+        return update_id + 1 if update_id else 1
 
     def update_answer(self, *, quiz_id: str, question: int, team_id: int, answer: str, answer_time: int) -> int:
         with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
-                (update_id, timestamp,) = db.execute('SELECT update_id, timestamp '
-                                                     'FROM answers '
-                                                     'WHERE quiz_id = ? AND question = ? AND team_id = ?',
-                                                     (quiz_id, question, team_id)).fetchone() or (0, 0)
+                (update_id, timestamp,) = self._select_answer(
+                    db=db, quiz_id=quiz_id, question=question, team_id=team_id)
 
                 # Don't update the answer if it's older than the current one.
                 if timestamp > answer_time:
                     return 0
 
-                (last_update_id,) = db.execute(
-                    'SELECT MAX(update_id) FROM answers').fetchone()
-                new_update_id = (last_update_id or 0) + 1
+                new_update_id = self._get_next_answer_update_id(db)
 
                 if update_id:
                     db.execute('UPDATE answers '
-                               'SET update_id = ?, answer = ?, timestamp = ? '
+                               'SET update_id = ?, answer = ?, timestamp = ?, points = NULL '
                                'WHERE update_id = ?',
                                (new_update_id, answer, answer_time, update_id))
                 else:
@@ -84,6 +92,23 @@ class QuizDb:
                                'VALUES (?, ?, ?, ?, ?, ?)',
                                (new_update_id, quiz_id, question, team_id, answer, answer_time))
 
+                return new_update_id
+
+    def update_answer_points(self, *, quiz_id: str, question: int, team_id: int, points: int) -> int:
+        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                (update_id, _) = self._select_answer(
+                    db=db, quiz_id=quiz_id, question=question, team_id=team_id)
+
+                if not update_id:
+                    return 0
+
+                new_update_id = self._get_next_answer_update_id(db)
+
+                db.execute('UPDATE answers '
+                           'SET update_id = ?, points = ? '
+                           'WHERE update_id = ?',
+                           (new_update_id, points, update_id))
                 return new_update_id
 
     def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:
@@ -185,6 +210,7 @@ class QuizDb:
                     team_id INTEGER NOT NULL,
                     answer TEXT NOT NULL,
                     timestamp INTEGER NOT NULL,
+                    points INTEGER,
                     UNIQUE(quiz_id, question, team_id))''')
                 db.execute('''CREATE TABLE IF NOT EXISTS messages (
                     insert_timestamp INTEGER NOT NULL,

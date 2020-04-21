@@ -27,13 +27,14 @@ class BaseTestCase(unittest.TestCase):
 
     def _select_answers(self):
         with sqlite3.connect(self.db_path) as db:
-            return db.execute('SELECT update_id, quiz_id, question, team_id, answer, timestamp FROM answers').fetchall()
+            return db.execute(
+                'SELECT update_id, quiz_id, question, team_id, answer, timestamp, points FROM answers').fetchall()
 
     def _insert_into_answers(self, values: List[Dict[str, Any]]):
         with sqlite3.connect(self.db_path) as db:
             with db:
                 db.executemany('INSERT INTO answers '
-                               'VALUES (:update_id, :quiz_id, :question, :team_id, :answer, :timestamp)', values)
+                               'VALUES (:update_id, :quiz_id, :question, :team_id, :answer, :timestamp, :points)', values)
 
     def _select_teams(self):
         with sqlite3.connect(self.db_path) as db:
@@ -127,66 +128,22 @@ class QuizDbTest(BaseTestCase):
             quiz_id='test', min_update_id=5)
         self.assertListEqual(sorted([]), sorted(teams))
 
-    def test_update_answer(self):
-        prev_update_id = self._get_last_answers_update_id()
-        update_id = self.quiz_db.update_answer(quiz_id='test', question=3, team_id=5001,
-                                               answer='Unicode Юнікод 😎', answer_time=123)
-
-        self.assertEqual(prev_update_id+1, update_id)
-        self.assertListEqual([
-            (update_id, 'test', 3, 5001, 'Unicode Юнікод 😎', 123),
-        ], self._select_answers())
-        self.assertEqual(update_id, self._get_last_answers_update_id())
-
-        prev_update_id = self._get_last_answers_update_id()
-        update_id = self.quiz_db.update_answer(quiz_id='other', question=12, team_id=5002,
-                                               answer='Apple', answer_time=321)
-
-        self.assertEqual(prev_update_id+1, update_id)
-        self.assertListEqual([
-            (prev_update_id, 'test', 3, 5001, 'Unicode Юнікод 😎', 123),
-            (update_id, 'other', 12, 5002, 'Apple', 321),
-        ], self._select_answers())
-        self.assertEqual(update_id, self._get_last_answers_update_id())
-
-        prev_update_id = self._get_last_answers_update_id()
-        update_id = self.quiz_db.update_answer(quiz_id='test', question=3, team_id=5001,
-                                               answer='Banana', answer_time=124)
-
-        self.assertEqual(update_id, update_id)
-        self.assertListEqual([
-            (prev_update_id, 'other', 12, 5002, 'Apple', 321),
-            (update_id, 'test', 3, 5001, 'Banana', 124),
-        ], self._select_answers())
-        self.assertEqual(update_id, self._get_last_answers_update_id())
-
-        prev_update_id = self._get_last_answers_update_id()
-        update_id = self.quiz_db.update_answer(quiz_id='test', question=3, team_id=5001,
-                                               answer='Carrot', answer_time=123)
-
-        self.assertEqual(0, update_id)
-        self.assertListEqual([
-            (prev_update_id-1, 'other', 12, 5002, 'Apple', 321),
-            (prev_update_id, 'test', 3, 5001, 'Banana', 124),
-        ], self._select_answers())
-        self.assertEqual(prev_update_id, self._get_last_answers_update_id())
-
     def test_get_answers(self):
         self._insert_into_answers([
             dict(update_id=2, quiz_id='test', question=5, team_id=5001,
-                 answer='Apple', timestamp=123),
+                 answer='Apple', timestamp=123, points=4),
             dict(update_id=3, quiz_id='ignored', question=5, team_id=5001,
-                 answer='Ignored', timestamp=321),
+                 answer='Ignored', timestamp=321, points=1),
             dict(update_id=4, quiz_id='test', question=9, team_id=5002,
-                 answer='Unicode Юнікод 😎', timestamp=34),
+                 answer='Unicode Юнікод 😎', timestamp=34, points=None),
         ])
         answers = self.quiz_db.get_answers('test')
 
         self.assertListEqual(sorted([
             Answer(quiz_id='test', question=9, team_id=5002,
-                   answer='Unicode Юнікод 😎', timestamp=34),
+                   answer='Unicode Юнікод 😎', timestamp=34, points=None),
             Answer(quiz_id='test', question=5, team_id=5001,
-                   answer='Apple', timestamp=123),
+                   answer='Apple', timestamp=123, points=4),
         ]), sorted(answers))
 
         answers = self.quiz_db.get_answers('test', min_update_id=3)
@@ -194,6 +151,64 @@ class QuizDbTest(BaseTestCase):
             Answer(quiz_id='test', question=9, team_id=5002,
                    answer='Unicode Юнікод 😎', timestamp=34),
         ]), sorted(answers))
+
+
+class UpdateAnswerTest(BaseTestCase):
+    def test_inserts_new_answer(self):
+        update_id = self.quiz_db.update_answer(quiz_id='test', question=3, team_id=5001,
+                                               answer='Unicode Юнікод 😎', answer_time=123)
+
+        self.assertEqual(1, update_id)
+        self.assertListEqual([
+            (1, 'test', 3, 5001, 'Unicode Юнікод 😎', 123, None),
+        ], self._select_answers())
+        self.assertEqual(1, self._get_last_answers_update_id())
+
+    def test_updates_old_answer_and_resets_points(self):
+        self._insert_into_answers([dict(update_id=2, quiz_id='test', question=5, team_id=5001,
+                                        answer='Apple', timestamp=123, points=4)])
+        update_id = self.quiz_db.update_answer(quiz_id='test', question=5, team_id=5001,
+                                               answer='Unicode Юнікод 😎', answer_time=124)
+
+        self.assertEqual(3, update_id)
+        self.assertListEqual([
+            (3, 'test', 5, 5001, 'Unicode Юнікод 😎', 124, None),
+        ], self._select_answers())
+        self.assertEqual(3, self._get_last_answers_update_id())
+
+    def test_outdated_answer(self):
+        self._insert_into_answers([dict(update_id=2, quiz_id='test', question=5, team_id=5001,
+                                        answer='Apple', timestamp=123, points=4)])
+        update_id = self.quiz_db.update_answer(quiz_id='test', question=5, team_id=5001,
+                                               answer='Unicode Юнікод 😎', answer_time=122)
+
+        self.assertEqual(0, update_id)
+        self.assertListEqual([
+            (2, 'test', 5, 5001, 'Apple', 123, 4),
+        ], self._select_answers())
+        self.assertEqual(2, self._get_last_answers_update_id())
+
+
+class UpdateAnswerPointsTest(BaseTestCase):
+
+    def test_updates_points(self):
+        self._insert_into_answers([dict(update_id=2, quiz_id='test', question=5, team_id=5001,
+                                        answer='Apple', timestamp=123, points=4)])
+        update_id = self.quiz_db.update_answer_points(
+            quiz_id='test', question=5, team_id=5001, points=7)
+
+        self.assertEqual(3, update_id)
+        self.assertListEqual([
+            (3, 'test', 5, 5001, 'Apple', 123, 7),
+        ], self._select_answers())
+        self.assertEqual(3, self._get_last_answers_update_id())
+
+    def test_non_existing_answer(self):
+        update_id = self.quiz_db.update_answer_points(
+            quiz_id='test', question=4, team_id=5001, points=7)
+
+        self.assertEqual(0, update_id)
+        self.assertListEqual([], self._select_answers())
 
 
 class UpdateTeamTest(BaseTestCase):

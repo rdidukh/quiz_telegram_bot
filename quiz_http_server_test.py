@@ -127,9 +127,9 @@ class GetUpdatesApiTest(BaseTestCase):
         ))
         self.quiz.quiz_db.get_answers = MagicMock(return_value=[
             Answer(quiz_id='test', question=5, team_id=5001,
-                   answer='Apple', timestamp=1234, update_id=201),
+                   answer='Apple', timestamp=1234, update_id=201, points=3),
             Answer(quiz_id='test', question=8, team_id=5002,
-                   answer='Unicode Юнікод', timestamp=1236, update_id=202),
+                   answer='Unicode Юнікод', timestamp=1236, update_id=202, points=None),
         ])
         self.quiz.quiz_db.get_teams = MagicMock(return_value=[
             Team(quiz_id='test', id=5001, name='Liverpool',
@@ -162,9 +162,9 @@ class GetUpdatesApiTest(BaseTestCase):
             ],
             'answers': [
                 dict(quiz_id='test', question=5, team_id=5001,
-                     answer='Apple', timestamp=1234, update_id=201),
+                     answer='Apple', timestamp=1234, update_id=201, points=3),
                 dict(quiz_id='test', question=8, team_id=5002,
-                     answer='Unicode Юнікод', timestamp=1236, update_id=202),
+                     answer='Unicode Юнікод', timestamp=1236, update_id=202, points=None),
             ],
         }, json.loads(response.body))
         self.quiz.get_status.assert_called_once()
