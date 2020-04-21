@@ -262,8 +262,6 @@ class HandleAnswerUpdateTest(BaseTestCase):
                    answer='Banana', timestamp=4),
         ]
 
-        expected_answers_dict = {1: {5001: 'Banana'}}
-        self.assertDictEqual(expected_answers_dict, self.quiz.answers)
         self.assertListEqual(
             expected_answers, self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_called_with('Confirmed: Banana.')

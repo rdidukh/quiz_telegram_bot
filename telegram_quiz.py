@@ -6,7 +6,7 @@ from quiz_db import Answer, Message, QuizDb, Team
 import telegram.ext
 import telegram.update
 import time
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 
 class TelegramQuizError(Exception):
@@ -53,9 +53,6 @@ class TelegramQuiz:
         self.strings: Strings = self._get_strings(strings_file, language)
         # Init with the number of milliseconds since 2020-01-01 00:00 UTC.
         self._status_update_id = int(time.time()*1000) - 1577836800000
-        # DEPRECATED: Used to support old tests.
-        self._answers_for_testing = None
-        self._teams_for_testing = None
 
     def _get_strings(self, strings_file: str, language: str) -> Strings:
         try:
@@ -82,39 +79,6 @@ class TelegramQuiz:
             setattr(strings, string, obj[language][string])
 
         return strings
-
-    # DEPRECATED: Left for backward compatibility only.
-    @property
-    def answers(self) -> Dict[str, Dict[int, str]]:
-        # This is a hack, but the method is going to be removed soon anyway.
-        if self._answers_for_testing:
-            return self._answers_for_testing
-        result: Dict[str, Dict[int, str]] = {}
-        answers = self.quiz_db.get_answers(quiz_id=self.id)
-        for answer in answers:
-            question = answer.question
-            if question not in result:
-                result[question] = {}
-            result[question][answer.team_id] = answer.answer
-        return result
-
-    # DEPRECATED: Left for testing only.
-    @answers.setter
-    def answers(self, value):
-        self._answers_for_testing = value
-
-    # DEPRECATED: Left for backward compatibility only.
-    @property
-    def teams(self) -> Dict[int, str]:
-        if self._teams_for_testing:
-            return self._teams_for_testing
-        teams = self.quiz_db.get_teams(quiz_id=self.id)
-        return {team.id: team.name for team in teams}
-
-    # DEPRECATED: Left for testing only.
-    @teams.setter
-    def teams(self, value):
-        self._teams_for_testing = value
 
     def _handle_registration_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
         chat_id = update.message.chat_id

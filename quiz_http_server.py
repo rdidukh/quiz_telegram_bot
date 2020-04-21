@@ -48,18 +48,6 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
         self.write(json.dumps(response))
 
 
-class GetStatusApiHandler(BaseQuizRequestHandler):
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            'quiz_id': self.quiz.id,
-            'teams': self.quiz.teams,
-            'answers': self.quiz.answers,
-            "language": self.quiz.language,
-            'question': self.quiz.question,
-            'is_registration': self.quiz.is_registration()
-        }
-
-
 class GetUpdatesApiHandler(BaseQuizRequestHandler):
 
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
@@ -134,7 +122,6 @@ def create_quiz_tornado_app(*, quiz: TelegramQuiz) -> tornado.web.Application:
     args = dict(quiz=quiz)
     return tornado.web.Application([
         ('/', RootHandler),
-        ('/api/getStatus', GetStatusApiHandler, args),
         ('/api/getUpdates', GetUpdatesApiHandler, args),
         ('/api/startRegistration', StartRegistrationApiHandler, args),
         ('/api/stopRegistration', StopRegistrationApiHandler, args),

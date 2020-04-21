@@ -57,7 +57,7 @@ class TestQuizHttpServer(BaseTestCase):
         self.assertEqual(200, response.code)
 
     def test_invalid_json(self):
-        response = self.fetch('/api/getStatus', method='POST', body='#$%')
+        response = self.fetch('/api/getUpdates', method='POST', body='#$%')
         self.assertEqual(400, response.code)
         self.assertDictEqual({
             'error': 'Request is not a valid JSON object.'
@@ -112,44 +112,6 @@ class TestQuizHttpServer(BaseTestCase):
         self.assertEqual(200, response.code)
         self.assertDictEqual({}, json.loads(response.body))
         self.assertIsNone(self.quiz.question)
-
-    def test_get_status(self):
-        self.maxDiff = None
-        self.quiz.question = 2
-        self.quiz.teams = {
-            1: 'Barcelona',
-            2: 'Real Madrid',
-            3: 'Liverpool',
-        }
-        self.quiz.answers = {
-            '1': {
-                3: 'Apple',
-                4: 'Юнікод',
-            },
-            '2': {
-                5: 'Mars',
-                6: 'Jupiter',
-            }
-        }
-        response = self.fetch('/api/getStatus', method='POST', body='')
-        self.assertEqual(200, response.code)
-        self.assertDictEqual({
-            'quiz_id': 'test',
-            'is_registration': False,
-            'question': 2,
-            'language': 'lang',
-            'teams': {'1': 'Barcelona', '2': 'Real Madrid', '3': 'Liverpool'},
-            'answers': {
-                '1': {
-                    '3': 'Apple',
-                    '4': 'Юнікод',
-                },
-                '2': {
-                    '5': 'Mars',
-                    '6': 'Jupiter',
-                }
-            },
-        }, json.loads(response.body))
 
 
 class GetUpdatesApiTest(BaseTestCase):
