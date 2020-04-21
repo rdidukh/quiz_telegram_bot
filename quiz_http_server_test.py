@@ -34,8 +34,8 @@ class BaseTestCase(tornado.testing.AsyncHTTPTestCase):
         self.strings_file = os.path.join(self.test_dir.name, 'strings.json')
         with open(self.strings_file, 'w') as file:
             file.write(STRINGS)
-        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=4,
-                                 language='lang', strings_file=self.strings_file, quiz_db=self.quiz_db)
+        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', language='lang',
+                                 strings_file=self.strings_file, quiz_db=self.quiz_db)
         return create_quiz_tornado_app(quiz=self.quiz)
 
     def tearDown(self):
@@ -90,43 +90,43 @@ class TestQuizHttpServer(BaseTestCase):
         self.assertFalse(self.quiz.is_registration())
 
     def test_start_question(self):
-        request = {'question_id': '01'}
+        request = {'question': 1}
         response = self.fetch('/api/startQuestion',
                               method='POST', body=json.dumps(request))
         self.assertEqual(200, response.code)
         self.assertDictEqual({}, json.loads(response.body))
-        self.assertEqual('01', self.quiz.question_id)
+        self.assertEqual(1, self.quiz.question)
 
     def test_start_wrong_question(self):
-        request = {'question_id': 'unexisting'}
+        request = {'question': 'unexisting'}
         response = self.fetch('/api/startQuestion',
                               method='POST', body=json.dumps(request))
         self.assertEqual(400, response.code)
         self.assertListEqual(['error'],
                              list(json.loads(response.body).keys()))
-        self.assertIsNone(self.quiz.question_id)
+        self.assertIsNone(self.quiz.question)
 
     def test_stop_question(self):
-        self.quiz.start_question('01')
+        self.quiz.start_question(1)
         response = self.fetch('/api/stopQuestion', method='POST', body='')
         self.assertEqual(200, response.code)
         self.assertDictEqual({}, json.loads(response.body))
-        self.assertIsNone(self.quiz.question_id)
+        self.assertIsNone(self.quiz.question)
 
     def test_get_status(self):
         self.maxDiff = None
-        self.quiz.question_id = '02'
+        self.quiz.question = 2
         self.quiz.teams = {
             1: 'Barcelona',
             2: 'Real Madrid',
             3: 'Liverpool',
         }
         self.quiz.answers = {
-            '01': {
+            '1': {
                 3: 'Apple',
                 4: 'Юнікод',
             },
-            '02': {
+            '2': {
                 5: 'Mars',
                 6: 'Jupiter',
             }
@@ -136,17 +136,15 @@ class TestQuizHttpServer(BaseTestCase):
         self.assertDictEqual({
             'quiz_id': 'test',
             'is_registration': False,
-            'question_id': '02',
-            'number_of_questions': 4,
+            'question': 2,
             'language': 'lang',
-            'question_set': ['01', '02', '03', '04'],
             'teams': {'1': 'Barcelona', '2': 'Real Madrid', '3': 'Liverpool'},
             'answers': {
-                '01': {
+                '1': {
                     '3': 'Apple',
                     '4': 'Юнікод',
                 },
-                '02': {
+                '2': {
                     '5': 'Mars',
                     '6': 'Jupiter',
                 }
@@ -160,7 +158,6 @@ class GetUpdatesApiTest(BaseTestCase):
         self.quiz.get_status = MagicMock(return_value=QuizStatus(
             update_id=101,
             quiz_id='test',
-            number_of_questions=19,
             language='lang',
             question=None,
             registration=False,
@@ -190,7 +187,6 @@ class GetUpdatesApiTest(BaseTestCase):
             'status': {
                 'update_id': 101,
                 'quiz_id': 'test',
-                'number_of_questions': 19,
                 'language': 'lang',
                 'question': None,
                 'registration': False,

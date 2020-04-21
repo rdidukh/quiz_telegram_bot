@@ -6,7 +6,7 @@ from quiz_db import Answer, Message, QuizDb, Team
 import telegram.ext
 import telegram.update
 import time
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 
 class TelegramQuizError(Exception):
@@ -24,7 +24,6 @@ class Strings:
 class QuizStatus:
     update_id: int
     quiz_id: str
-    number_of_questions: int
     language: str
     question: Optional[int]
     registration: bool
@@ -42,17 +41,13 @@ class TelegramQuiz:
     def __init__(self, *, id: str,
                  bot_token: str,
                  quiz_db: QuizDb,
-                 number_of_questions: int,
                  strings_file: str,
                  language: str):
         self.id = id
         self.quiz_db = quiz_db
         self.registration_handler: telegram.ext.MessageHandler = None
         self.question_handler: telegram.ext.MessageHandler = None
-        self.question_set: Set[str] = {f'{i:02}' for i in range(
-            1, number_of_questions + 1)}
-        self.number_of_questions = number_of_questions
-        self.question_id: str = None
+        self.question: Optional[int] = None
         self.updater = telegram.ext.Updater(bot_token, use_context=True)
         self.language = language
         self.strings: Strings = self._get_strings(strings_file, language)
@@ -97,7 +92,7 @@ class TelegramQuiz:
         result: Dict[str, Dict[int, str]] = {}
         answers = self.quiz_db.get_answers(quiz_id=self.id)
         for answer in answers:
-            question = f'{answer.question:02}'
+            question = answer.question
             if question not in result:
                 result[question] = {}
             result[question][answer.team_id] = answer.answer
@@ -146,14 +141,14 @@ class TelegramQuiz:
             message.reply_text(self.strings.registration_invitation)
 
     def start_registration(self):
-        if self.question_id:
+        if self.question is not None:
             logging.warning(f'Trying to start registration for quiz "{self.id}", '
-                            f'but question "{self.question_id}" is already started.')
+                            f'when question {self.question} is running.')
             raise TelegramQuizError(
-                f'Can not start registration of quiz "{self.id}" when question "{self.question_id}" is running.')
+                f'Can not start registration of quiz "{self.id}" when question {self.question} is running.')
         if self.registration_handler:
             logging.warning(
-                f'Trying to start registration for game "{self.id}", but registration is already running.')
+                f'Trying to start registration for quiz "{self.id}", but registration is already running.')
             raise TelegramQuizError(
                 f'Can not start registration of quiz "{self.id}" because registration is already on.')
         self.registration_handler = telegram.ext.MessageHandler(
@@ -161,7 +156,7 @@ class TelegramQuiz:
         self.updater.dispatcher.add_handler(
             self.registration_handler, group=1)
         self._on_status_update()
-        logging.info(f'Registration for game "{self.id}" has started.')
+        logging.info(f'Registration for quiz "{self.id}" has started.')
 
     def stop_registration(self):
         if not self.registration_handler:
@@ -173,7 +168,7 @@ class TelegramQuiz:
             self.registration_handler, group=1)
         self.registration_handler = None
         self._on_status_update()
-        logging.info(f'Registration for game "{self.id}" has ended.')
+        logging.info(f'Registration for quiz "{self.id}" has ended.')
 
     def is_registration(self) -> bool:
         return self.registration_handler is not None
@@ -188,12 +183,12 @@ class TelegramQuiz:
             return
         team = teams[0]
         logging.info(f'Answer received. '
-                     f'question_id: {self.question_id}, quiz_id: {self.id}, team_id: {team.id}, '
+                     f'question: {self.question}, quiz_id: {self.id}, team_id: {team.id}, '
                      f'team: "{team.name}", answer: "{answer}"')
 
         update_id = self.quiz_db.update_answer(
             quiz_id=self.id,
-            question=int(self.question_id),
+            question=self.question,
             team_id=chat_id,
             answer=answer,
             answer_time=answer_time,
@@ -204,49 +199,46 @@ class TelegramQuiz:
                 self.strings.answer_confirmation.format(answer=answer))
         else:
             logging.warning(
-                f'Outdated answer. quiz_id: "{self.id}", question: {self.question_id}, '
+                f'Outdated answer. quiz_id: "{self.id}", question: {self.question}, '
                 'team_id: {chat_id}, answer: {answer}, time: {answer_time}')
         logging.info(
             f'Answer update handler took {(time.time() - start_time):.6f} sec.')
 
-    def start_question(self, question_id: str):
+    def start_question(self, question: int):
+        if not isinstance(question, int):
+            raise Exception('Parameter question must be an integer.')
         if self.registration_handler:
-            logging.warning(f'Trying to start question "{question_id}" for game "{self.id}", '
+            logging.warning(f'Trying to start question {question} for quiz "{self.id}", '
                             f'but the registration is not finished.')
             raise TelegramQuizError(
                 'Can not start a question during registration.')
-        if self.question_id:
-            logging.warning(f'Trying to start question "{question_id}" for game "{self.id}", '
-                            f'but question "{self.question_id}" is already started.')
+        if self.question is not None:
+            logging.warning(f'Trying to start question {question} for quiz "{self.id}", '
+                            f'but question {self.question} is already started.')
             raise TelegramQuizError(
-                'Can not start a question during another question.')
-        if question_id not in self.question_set:
-            logging.warning(f'Trying to start question "{question_id}" for game "{self.id}", '
-                            f'but it is not in the question set.')
-            raise TelegramQuizError(
-                f'Can not start question "{question_id}" which is not in the question set: {self.question_set}')
+                f'Can not start question {question} because question {self.question} is already running.')
         self.question_handler = telegram.ext.MessageHandler(
             telegram.ext.Filters.text, self._handle_answer_update)
         self.updater.dispatcher.add_handler(
             self.question_handler, group=1)
-        self.question_id = question_id
+        self.question = question
         self._on_status_update()
         logging.info(
-            f'Question "{question_id}" for game "{self.id}" has started.')
+            f'Question {question} for quiz "{self.id}" has started.')
 
     def stop_question(self):
-        if not self.question_id:
+        if self.question is None:
             logging.warning(
                 f'Attempt to stop a question, but no question was running. quiz_id: "{self.id}".')
             raise TelegramQuizError(
                 'Can not stop a question, when no question is running.')
         self.updater.dispatcher.remove_handler(
             self.question_handler, group=1)
-        self.question_id = None
+        self.question = None
         self.question_handler = None
         self._on_status_update()
         logging.info(
-            f'Question "{self.question_id}" for game "{self.id}" has ended.')
+            f'Question {self} for quiz "{self.id}" has stopped.')
 
     def _handle_log_update(self, update: telegram.update.Update, context):
         update_id = update.update_id or 0
@@ -291,9 +283,8 @@ class TelegramQuiz:
         return QuizStatus(
             update_id=self._status_update_id,
             quiz_id=self.id,
-            number_of_questions=self.number_of_questions,
             language=self.language,
-            question=int(self.question_id) if self.question_id else None,
+            question=self.question,
             registration=bool(self.registration_handler),
             time=datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
         )

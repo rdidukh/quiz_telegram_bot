@@ -56,14 +56,8 @@ class Api {
     }
 
     async startQuestion(question) {
-        if (question < 10) {
-            var questionId = '0' + question.toString()
-        } else {
-            var questionId = question.toString()
-        }
-
         try {
-            await this.callServer('startQuestion', { 'question_id': questionId })
+            await this.callServer('startQuestion', { question: question })
             console.log('Question ' + question + 'started!')
         } catch (error) {
             console.warn('Could not start question ' + question + ': ' + error)

@@ -28,7 +28,7 @@ class BaseTestCase(unittest.TestCase):
         with open(self.strings_file, 'w') as file:
             file.write(STRINGS)
         self.quiz_db = QuizDb(db_path=self.db_path)
-        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', number_of_questions=2, language='lang',
+        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', language='lang',
                                  strings_file=self.strings_file, quiz_db=self.quiz_db)
 
     def tearDown(self):
@@ -53,7 +53,7 @@ class StartRegistrationTest(BaseTestCase):
         self.assertEqual(update_id, self.quiz.status_update_id)
 
     def test_raises_when_question_is_on(self):
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError, self.quiz.start_registration)
         self.assertEqual(update_id, self.quiz.status_update_id)
@@ -79,38 +79,38 @@ class StartQuestionTest(BaseTestCase):
     def test_starts_question(self):
         update_id = self.quiz.status_update_id
         self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         self.assertEqual(self.quiz._handle_answer_update,
                          self.quiz.updater.dispatcher.handlers[1][0].callback)
-        self.assertEqual('01', self.quiz.question_id)
+        self.assertEqual(1, self.quiz.question)
         self.assertGreater(self.quiz.status_update_id, update_id)
 
     def test_start_question_twice_raises(self):
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError,
-                          self.quiz.start_question, question_id='01')
+                          self.quiz.start_question, question=1)
         self.assertEqual(update_id, self.quiz.status_update_id)
 
     def test_start_raises_when_registration_is_on(self):
         self.quiz.start_registration()
         update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError,
-                          self.quiz.start_question, question_id='01')
+                          self.quiz.start_question, question=1)
         self.assertEqual(update_id, self.quiz.status_update_id)
 
 
 class StopQuestionTest(BaseTestCase):
     def test_stops_question(self):
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         update_id = self.quiz.status_update_id
         self.quiz.stop_question()
         self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
-        self.assertIsNone(self.quiz.question_id)
+        self.assertIsNone(self.quiz.question)
         self.assertGreater(self.quiz.status_update_id, update_id)
 
     def test_stop_question_twice_raises(self):
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         self.quiz.stop_question()
         update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError,
@@ -230,7 +230,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
             chat=telegram.Chat(5001, 'private'), text='Banana'))
         update.message.reply_text = MagicMock()
 
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         self.quiz._handle_answer_update(update, context=None)
         self.quiz.stop_question()
 
@@ -253,7 +253,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
             chat=telegram.Chat(5001, 'private'), text='Banana'))
         update.message.reply_text = MagicMock()
 
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         self.quiz._handle_answer_update(update, context=None)
         self.quiz.stop_question()
 
@@ -262,7 +262,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
                    answer='Banana', timestamp=4),
         ]
 
-        expected_answers_dict = {'01': {5001: 'Banana'}}
+        expected_answers_dict = {1: {5001: 'Banana'}}
         self.assertDictEqual(expected_answers_dict, self.quiz.answers)
         self.assertListEqual(
             expected_answers, self.quiz_db.get_answers(quiz_id='test'))
@@ -279,7 +279,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
             chat=telegram.Chat(5002, 'private'), text='Banana'))
         update.message.reply_text = MagicMock()
 
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         self.quiz._handle_answer_update(update, context=None)
         self.quiz.stop_question()
 
@@ -299,7 +299,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
             chat=telegram.Chat(5001, 'private'), text='Apple'))
         update.message.reply_text = MagicMock()
 
-        self.quiz.start_question(question_id='01')
+        self.quiz.start_question(question=1)
         self.quiz._handle_answer_update(update, context=None)
         self.quiz.stop_question()
 
@@ -318,7 +318,6 @@ class GetStatusTest(BaseTestCase):
             QuizStatus(
                 update_id=self.quiz.status_update_id,
                 quiz_id='test',
-                number_of_questions=2,
                 language='lang',
                 question=None,
                 registration=False,
@@ -334,7 +333,7 @@ class GetStatusTest(BaseTestCase):
         self.assertTrue(status.registration)
 
     def test_question(self):
-        self.quiz.start_question('01')
+        self.quiz.start_question(question=1)
         status = self.quiz.get_status()
         self.assertEqual(1, status.question)
 

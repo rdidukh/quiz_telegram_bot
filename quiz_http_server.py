@@ -54,10 +54,8 @@ class GetStatusApiHandler(BaseQuizRequestHandler):
             'quiz_id': self.quiz.id,
             'teams': self.quiz.teams,
             'answers': self.quiz.answers,
-            'question_set': sorted(list(self.quiz.question_set)),
-            "number_of_questions": self.quiz.number_of_questions,
             "language": self.quiz.language,
-            'question_id': self.quiz.question_id,
+            'question': self.quiz.question,
             'is_registration': self.quiz.is_registration()
         }
 
@@ -117,10 +115,12 @@ class StopRegistrationApiHandler(BaseQuizRequestHandler):
 
 class StartQuestionApiHandler(BaseQuizRequestHandler):
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        question_id = request.get('question_id')
-        if not question_id:
-            return {'error': 'Question not provided.'}
-        self.quiz.start_question(question_id=question_id)
+        question = request.get('question')
+        if question is None:
+            return {'error': 'Parameter question was not provided.'}
+        if not isinstance(question, int):
+            return {'error': 'Parameter question must be integer.'}
+        self.quiz.start_question(question=question)
         return {}
 
 

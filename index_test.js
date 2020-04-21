@@ -58,7 +58,7 @@ describe('InitResultsTable', () => {
             args = fetcher.calls.slice(-1).pop()
             assert.equal(args.url, '/api/startQuestion')
             assert.deepEqual(JSON.parse(args.options.body), {
-                question_id: '0' + q
+                question: q
             })
         }
     });

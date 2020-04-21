@@ -15,7 +15,6 @@ def _parse_args(args: List[str]):
     parser.add_argument('--quiz-db', default='quiz.db')
     parser.add_argument('--quiz-id', required=True)
     parser.add_argument('--telegram-bot-token', required=True)
-    parser.add_argument('--number-of-questions', default=30)
     parser.add_argument('--strings-file', default='strings.json')
     parser.add_argument('--language', default='uk')
     return parser.parse_args()
@@ -25,7 +24,8 @@ def main(args: List[str]):
     args = _parse_args(args)
 
     log_format = '%(asctime)s: %(process)s: %(levelname)s: %(filename)s:%(lineno)d - %(message)s'
-    logging.basicConfig(filename=args.log_file, format=log_format, level=logging.INFO)
+    logging.basicConfig(filename=args.log_file,
+                        format=log_format, level=logging.INFO)
 
     logging.info('')
     logging.info('Hello!')
@@ -33,7 +33,6 @@ def main(args: List[str]):
     quiz_db = QuizDb(db_path=args.quiz_db)
 
     quiz = TelegramQuiz(id=args.quiz_id, bot_token=args.telegram_bot_token,
-                        number_of_questions=args.number_of_questions,
                         quiz_db=quiz_db, strings_file=args.strings_file,
                         language=args.language)
     quiz.start()
