@@ -1,3 +1,6 @@
+const correctAnswerButtonText = '\u2714' // ✔
+const wrongAnswerButtonText = '\u2716' // ✖
+
 class Api {
     constructor(fetcher) {
         this.fetcher = fetcher
@@ -70,6 +73,19 @@ class Api {
             console.log('Question stopped!')
         } catch (error) {
             console.warn('Could not stop question: ' + error)
+        }
+    }
+
+    async setAnswerPoints(question, teamId, points) {
+        try {
+            await this.callServer('setAnswerPoints', {
+                'question': question,
+                'team_id': teamId,
+                'points': points,
+            })
+            console.log('Answer points for question ' + question + ' of team ' + teamId + ' set to ' + points)
+        } catch (error) {
+            console.warn('Could not set answer points for question ' + question + ' of team ' + teamId + ': ' + error)
         }
     }
 }
@@ -159,6 +175,7 @@ class QuizController {
 
     showAnswersForQuestion(question) {
         this.currentQuestion = question
+        this.document.querySelector('#answers_header span').textContent = question
         this.updateAnswersTable()
     }
 
@@ -177,21 +194,46 @@ class QuizController {
             if (!row) {
                 row = table.insertRow(-1)
                 row.id = rowId
+
+                const correctButton = this.document.createElement('button')
+                correctButton.textContent = correctAnswerButtonText
+                correctButton.classList.add('correct_button')
+                correctButton.onclick = async () => {
+                    this.api.setAnswerPoints(this.currentQuestion, teamId, 1)
+                }
+
+                const wrongButton = this.document.createElement('button')
+                wrongButton.textContent = wrongAnswerButtonText
+                wrongButton.classList.add('wrong_button')
+                wrongButton.onclick = async () => {
+                    this.api.setAnswerPoints(this.currentQuestion, teamId, 0)
+                }
+
                 row.insertCell(-1).textContent = team.name
                 row.insertCell(-1) // Answer.
-                row.insertCell(-1) // Correct answer button.
-                row.insertCell(-1) // Wrong answer button.
+                row.insertCell(-1).appendChild(correctButton)
+                row.insertCell(-1).appendChild(wrongButton)
             }
 
             if (!answers.has(teamId)) {
                 // No answer to the question for this team.
-                var answerText = ''
+                var answer = { text: '', points: null }
             } else {
-                var answerText = answers.get(teamId).answer
+                var answer = answers.get(teamId)
+            }
+
+            if (answer.points == null) {
+                var cellClass = 'missing_answer'
+            } else if (answer.points > 0) {
+                var cellClass = 'correct_answer'
+            } else if (answer.points <= 0) {
+                var cellClass = 'wrong_answer'
             }
 
             updateTextContent(row.cells[0], team.name)
-            updateTextContent(row.cells[1], answerText)
+            updateTextContent(row.cells[1], answer.answer)
+            row.cells[1].classList.remove('correct_answer', 'wrong_answer', 'missing_answer')
+            row.cells[1].classList.add(cellClass)
         }
     }
 

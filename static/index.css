@@ -1,0 +1,47 @@
+table, th, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+}
+
+.action_button {
+    font-size: 16;
+    width: 200;
+    margin-top: 10px;
+    border: '1px solid black'
+}
+
+#answers_table td:first-child {
+    width: 10em
+}
+
+#answers_table td:nth-child(2) {
+    width: 10em
+}
+
+#answers_table th:first-child {
+    width: 10em
+}
+
+#answers_table th:nth-child(2) {
+    width: 10em
+}
+
+#answers_table button.correct_button {
+    color: green
+}
+
+#answers_table button.correct_button span {
+    content: '\u2714'
+}
+
+#answers_table button.wrong_button {
+    color: red
+}
+
+#answers_table td.correct_answer {
+    background-color: lightgreen;
+}
+
+#answers_table td.wrong_answer {
+    background-color: lightpink;
+}

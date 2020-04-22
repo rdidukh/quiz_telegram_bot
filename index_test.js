@@ -1,5 +1,6 @@
 const index = require('./static/index.js')
 const assert = require('assert');
+const fs = require('fs')
 const jsdom = require("jsdom");
 
 class MockFetcher {
@@ -17,7 +18,8 @@ class MockFetcher {
 
 describe('InitResultsTable', () => {
     it('#propagatesQuestionNumbers', () => {
-        const dom = new jsdom.JSDOM(`<html><body><table id="results_table"></table></body></html>`);
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
         const numberOfQuestions = 3
 
@@ -35,8 +37,9 @@ describe('InitResultsTable', () => {
         assert.equal(table.rows[0].cells[4].textContent, '3')
     });
 
-    it('#propagatesStartQuestionButtons', async () => {
-        const dom = new jsdom.JSDOM(`<html><body><table id="results_table"></table></body></html>`);
+    it('#startQuestionButtons', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
         const numberOfQuestions = 3
 
@@ -63,8 +66,9 @@ describe('InitResultsTable', () => {
         }
     });
 
-    it('#propagatesShowAnswersButtons', async () => {
-        const dom = new jsdom.JSDOM(`<html><body><table id="results_table"></table></body></html>`);
+    it('#showAnswersButtons', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
         const numberOfQuestions = 3
 
@@ -82,13 +86,15 @@ describe('InitResultsTable', () => {
             assert.equal(showButton.textContent, 'A')
             await showButton.onclick()
             assert.equal(controller.currentQuestion, q)
+            assert.equal(document.querySelector('#answers_header span').textContent, q)
         }
     });
 });
 
 describe('UpdateResultsTableTest', () => {
     it('#updatesTeamNamesAndAddsNewRows', () => {
-        const dom = new jsdom.JSDOM(`<html><body><table id="results_table"></table></body></html>`);
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
         const numberOfQuestions = 3
 
@@ -120,27 +126,20 @@ describe('UpdateResultsTableTest', () => {
 
 describe('ShowAnswersForQuestionTest', () => {
     it('#overwritesValues', () => {
-        const dom = new jsdom.JSDOM(`<html><body><table id="answers_table"></table></body></html>`);
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
 
         const table = document.getElementById('answers_table')
-        table.insertRow(-1).id = 'answers_team_5001_row'
-        table.insertRow(-1).id = 'answers_team_5002_row'
-        table.insertRow(-1).id = 'answers_team_5003_row'
-        table.insertRow(-1).id = 'answers_team_5004_row'
-        for (var r = 0; r < 4; r++) {
+        // Create 4 initial rows with existing teams.
+        for (var r = 1; r <= 4; r++) {
+            table.insertRow(-1).id = 'answers_team_500' + r + '_row'
             for (var c = 0; c < 4; c++) {
                 table.rows[r].insertCell(-1)
             }
+            table.rows[r].cells[0] = 'REMOVE'
+            table.rows[r].cells[1] = 'REMOVE'
         }
-        table.rows[0].cells[0] = 'REMOVE'
-        table.rows[0].cells[1] = 'REMOVE'
-        table.rows[1].cells[0] = 'REMOVE'
-        table.rows[1].cells[1] = 'REMOVE'
-        table.rows[2].cells[0] = 'REMOVE'
-        table.rows[2].cells[1] = 'REMOVE'
-        table.rows[3].cells[0] = 'REMOVE'
-        table.rows[3].cells[1] = 'REMOVE'
 
         const controller = new index.QuizController(document)
 
@@ -163,35 +162,36 @@ describe('ShowAnswersForQuestionTest', () => {
 
         assert.equal(controller.currentQuestion, 3)
 
-        assert.equal(table.rows.length, 4)
-        assert.equal(table.rows[0].cells.length, 4)
-        assert.equal(table.rows[1].cells.length, 4)
-
-        assert.equal(table.rows[0].cells[0].textContent, 'Austria')
-        assert.equal(table.rows[0].cells[1].textContent, 'Apple')
-        assert.equal(table.rows[1].cells[0].textContent, 'Belgium')
-        assert.equal(table.rows[1].cells[1].textContent, '')
-        assert.equal(table.rows[2].cells[0].textContent, 'Croatia')
-        assert.equal(table.rows[2].cells[1].textContent, 'Carrot')
-        assert.equal(table.rows[3].cells[0].textContent, 'Denmark')
-        assert.equal(table.rows[3].cells[1].textContent, '')
+        assert.equal(table.rows.length, 5)
+        for (var r = 1; r <= 4; r++) {
+            assert.equal(table.rows[r].cells.length, 4)
+        }
+        assert.equal(table.rows[1].cells[0].textContent, 'Austria')
+        assert.equal(table.rows[1].cells[1].textContent, 'Apple')
+        assert.equal(table.rows[2].cells[0].textContent, 'Belgium')
+        assert.equal(table.rows[2].cells[1].textContent, '')
+        assert.equal(table.rows[3].cells[0].textContent, 'Croatia')
+        assert.equal(table.rows[3].cells[1].textContent, 'Carrot')
+        assert.equal(table.rows[4].cells[0].textContent, 'Denmark')
+        assert.equal(table.rows[4].cells[1].textContent, '')
     });
 
     it('#emptyAnswersIndex', () => {
-        const dom = new jsdom.JSDOM(`<html><body><table id="answers_table"></table></body></html>`);
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
 
         const table = document.getElementById('answers_table')
         table.insertRow(-1).id = 'answers_team_5001_row'
         table.insertRow(-1).id = 'answers_team_5002_row'
         for (var i = 0; i < 4; i++) {
-            table.rows[0].insertCell(-1)
             table.rows[1].insertCell(-1)
+            table.rows[2].insertCell(-1)
         }
-        table.rows[0].cells[0] = 'REMOVE'
-        table.rows[0].cells[1] = 'REMOVE'
-        table.rows[1].cells[0] = 'REMOVE'
-        table.rows[1].cells[1] = 'REMOVE'
+        table.rows[1].cells[0].textContent = 'REMOVE'
+        table.rows[1].cells[1].textContent = 'REMOVE'
+        table.rows[2].cells[0].textContent = 'REMOVE'
+        table.rows[2].cells[1].textContent = 'REMOVE'
 
         const controller = new index.QuizController(document)
 
@@ -203,18 +203,19 @@ describe('ShowAnswersForQuestionTest', () => {
 
         controller.showAnswersForQuestion(2)
 
-        assert.equal(table.rows.length, 2)
-        assert.equal(table.rows[0].cells.length, 4)
+        assert.equal(table.rows.length, 3)
         assert.equal(table.rows[1].cells.length, 4)
+        assert.equal(table.rows[2].cells.length, 4)
 
-        assert.equal(table.rows[0].cells[0].textContent, 'Austria')
-        assert.equal(table.rows[0].cells[1].textContent, '')
-        assert.equal(table.rows[1].cells[0].textContent, 'Belgium')
+        assert.equal(table.rows[1].cells[0].textContent, 'Austria')
         assert.equal(table.rows[1].cells[1].textContent, '')
+        assert.equal(table.rows[2].cells[0].textContent, 'Belgium')
+        assert.equal(table.rows[2].cells[1].textContent, '')
     });
 
     it('#addsNewRows', () => {
-        const dom = new jsdom.JSDOM('<html><body><table id="answers_table"></table></body></html>');
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
 
         const controller = new index.QuizController(document)
@@ -232,9 +233,9 @@ describe('ShowAnswersForQuestionTest', () => {
         controller.showAnswersForQuestion(4)
 
         const table = document.getElementById('answers_table')
-        assert.equal(table.rows.length, 2)
-        assert.equal(table.rows[0].cells.length, 4)
+        assert.equal(table.rows.length, 3)
         assert.equal(table.rows[1].cells.length, 4)
+        assert.equal(table.rows[2].cells.length, 4)
 
         const austriaRow = table.querySelector('#answers_team_5001_row')
         assert.equal(austriaRow.cells[0].textContent, 'Austria')
@@ -244,18 +245,146 @@ describe('ShowAnswersForQuestionTest', () => {
         assert.equal(belgiumRow.cells[0].textContent, 'Belgium')
         assert.equal(belgiumRow.cells[1].textContent, 'Banana')
     });
+
+    it('#answerCellClass', () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const controller = new index.QuizController(document)
+
+        controller.teamsIndex = new Map([
+            [5001, { name: 'Austria' }],
+            [5002, { name: 'Belgium' }],
+            [5003, { name: 'Croatia' }],
+            [5004, { name: 'Denmark' }],
+        ])
+        controller.answersIndex = new Map([
+            [4, new Map([
+                [5001, { answer: 'Apple', points: 1 }],
+                [5002, { answer: 'Banana', points: 0 }],
+                [5003, { answer: 'Carrot' }],
+            ])],
+        ])
+
+        controller.showAnswersForQuestion(4)
+
+        {
+            const table = document.getElementById('answers_table')
+            const austriaRow = table.querySelector('#answers_team_5001_row')
+            assert.deepEqual(Array.from(austriaRow.cells[1].classList.values()), ['correct_answer'])
+            const belgiumRow = table.querySelector('#answers_team_5002_row')
+            assert.deepEqual(Array.from(belgiumRow.cells[1].classList.values()), ['wrong_answer'])
+            const croatiaRow = table.querySelector('#answers_team_5003_row')
+            assert.deepEqual(Array.from(croatiaRow.cells[1].classList.values()), ['missing_answer'])
+            const denmarkRow = table.querySelector('#answers_team_5004_row')
+            assert.deepEqual(Array.from(denmarkRow.cells[1].classList.values()), ['missing_answer'])
+        }
+
+        controller.answersIndex = new Map([
+            [4, new Map([
+                [5002, { answer: 'Banana', }],
+                [5003, { answer: 'Carrot', points: 0 }],
+                [5004, { answer: 'Dragon Fruit', points: 1 }],
+            ])],
+        ])
+
+        controller.showAnswersForQuestion(4)
+
+        {
+            const table = document.getElementById('answers_table')
+            const austriaRow = table.querySelector('#answers_team_5001_row')
+            assert.deepEqual(Array.from(austriaRow.cells[1].classList.values()), ['missing_answer'])
+            const belgiumRow = table.querySelector('#answers_team_5002_row')
+            assert.deepEqual(Array.from(belgiumRow.cells[1].classList.values()), ['missing_answer'])
+            const croatiaRow = table.querySelector('#answers_team_5003_row')
+            assert.deepEqual(Array.from(croatiaRow.cells[1].classList.values()), ['wrong_answer'])
+            const denmarkRow = table.querySelector('#answers_team_5004_row')
+            assert.deepEqual(Array.from(denmarkRow.cells[1].classList.values()), ['correct_answer'])
+        }
+    });
+
+    it('#correctAnswerButtons', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const fetcher = new MockFetcher()
+        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+
+        controller.teamsIndex = new Map([
+            [5001, { name: 'Austria' }],
+            [5002, { name: 'Belgium' }],
+        ])
+        controller.answersIndex = new Map([
+            [4, new Map([
+                [5001, { answer: 'Apple' }],
+                [5002, { answer: 'Banana' }]
+            ])],
+        ])
+
+        for (var question = 4; question <= 5; question++) {
+            controller.showAnswersForQuestion(question)
+            for (var teamId = 5001; teamId <= 5002; teamId++) {
+                var button = document.querySelector('#answers_team_' + teamId + '_row').cells[2].firstChild
+                assert.equal(button.tagName, 'BUTTON')
+                assert.equal(button.classList.contains('correct_button'), true)
+                await button.onclick()
+
+                var args = fetcher.calls.slice(-1).pop()
+                assert.equal(args.url, '/api/setAnswerPoints')
+                assert.deepEqual(JSON.parse(args.options.body), {
+                    question: question,
+                    points: 1,
+                    team_id: teamId,
+                })
+            }
+        }
+    })
+
+    it('#wrongAnswerButtons', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const fetcher = new MockFetcher()
+        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+
+        controller.teamsIndex = new Map([
+            [5001, { name: 'Austria' }],
+            [5002, { name: 'Belgium' }],
+        ])
+        controller.answersIndex = new Map([
+            [4, new Map([
+                [5001, { answer: 'Apple' }],
+                [5002, { answer: 'Banana' }]
+            ])],
+        ])
+
+        for (var question = 4; question <= 5; question++) {
+            controller.showAnswersForQuestion(question)
+            for (var teamId = 5001; teamId <= 5002; teamId++) {
+                var button = document.querySelector('#answers_team_' + teamId + '_row').cells[3].firstChild
+                assert.equal(button.tagName, 'BUTTON')
+                assert.equal(button.classList.contains('wrong_button'), true)
+                await button.onclick()
+
+                var args = fetcher.calls.slice(-1).pop()
+                assert.equal(args.url, '/api/setAnswerPoints')
+                assert.deepEqual(JSON.parse(args.options.body), {
+                    question: question,
+                    points: 0,
+                    team_id: teamId,
+                })
+            }
+        }
+    })
 });
 
 describe('UpdateQuizTest', () => {
     it('#updatesQuiz', () => {
-        const dom = new jsdom.JSDOM(`
-            <html>
-                <body>
-                    <table id="status_table">
-                    <table id="results_table"></table>
-                    <table id="answers_table"></table>
-                </body>
-            </html>`);
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
 
         const statusTable = document.getElementById('status_table')
