@@ -5,7 +5,11 @@ import tornado.httpserver
 import tornado.ioloop
 import tornado.netutil
 import tornado.web
-from typing import Any, Dict
+from typing import Any, Dict, Type
+
+
+class RequestParameterError(Exception):
+    pass
 
 
 class RootHandler(tornado.web.RequestHandler):
@@ -16,6 +20,15 @@ class RootHandler(tornado.web.RequestHandler):
 class BaseQuizRequestHandler(tornado.web.RequestHandler):
     def initialize(self, quiz: TelegramQuiz):
         self.quiz = quiz
+
+    def get_param_value(self, request: Dict[str, Any], param: str, param_type: Type) -> Any:
+        if param not in request:
+            raise RequestParameterError(f'Parameter {param} must be provided.')
+        value = request[param]
+        if not isinstance(value, param_type):
+            raise RequestParameterError(
+                f'Parameter {param} must be of type {param_type}.')
+        return value
 
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         return {}
@@ -35,7 +48,7 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
         try:
             response = self.handle_quiz_request(request)
             status_code = 400 if response.get('error') else 200
-        except TelegramQuizError as e:
+        except (RequestParameterError, TelegramQuizError) as e:
             response = {'error': str(e)}
             status_code = 400
         except Exception:
@@ -51,27 +64,12 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
 class GetUpdatesApiHandler(BaseQuizRequestHandler):
 
     def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        min_status_update_id = request.get('min_status_update_id')
-        min_teams_update_id = request.get('min_teams_update_id')
-        min_answers_update_id = request.get('min_answers_update_id')
-
-        if min_status_update_id is None:
-            return {'error': 'Parameter min_status_update_id must be provided.'}
-
-        if min_teams_update_id is None:
-            return {'error': 'Parameter min_teams_update_id must be provided.'}
-
-        if min_answers_update_id is None:
-            return {'error': 'Parameter min_answers_update_id must be provided.'}
-
-        if not isinstance(min_status_update_id, int):
-            return {'error': 'Parameter min_status_update_id must be integer.'}
-
-        if not isinstance(min_teams_update_id, int):
-            return {'error': 'Parameter min_teams_update_id must be integer.'}
-
-        if not isinstance(min_answers_update_id, int):
-            return {'error': 'Parameter min_answers_update_id must be integer.'}
+        min_status_update_id = self.get_param_value(
+            request, 'min_status_update_id', int)
+        min_teams_update_id = self.get_param_value(
+            request, 'min_teams_update_id', int)
+        min_answers_update_id = self.get_param_value(
+            request, 'min_answers_update_id', int)
 
         if self.quiz.status_update_id >= min_status_update_id:
             status = self.quiz.get_status()
@@ -87,6 +85,24 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
             'teams': [t.__dict__ for t in teams],
             'answers': [a.__dict__ for a in answers],
         }
+
+
+class SetAnswerPointsApiHandler(BaseQuizRequestHandler):
+    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        question = self.get_param_value(request, 'question', int)
+        team_id = self.get_param_value(request, 'team_id', int)
+        points = self.get_param_value(request, 'points', int)
+
+        update_id = self.quiz.quiz_db.set_answer_points(
+            quiz_id=self.quiz.id,
+            question=question,
+            team_id=team_id,
+            points=points)
+
+        if not update_id:
+            return {'error': f'Answer for quiz "{self.quiz.id}", question {question}, team {team_id} does not exist.'}
+
+        return {}
 
 
 class StartRegistrationApiHandler(BaseQuizRequestHandler):
@@ -123,6 +139,7 @@ def create_quiz_tornado_app(*, quiz: TelegramQuiz) -> tornado.web.Application:
     return tornado.web.Application([
         ('/', RootHandler),
         ('/api/getUpdates', GetUpdatesApiHandler, args),
+        ('/api/setAnswerPoints', SetAnswerPointsApiHandler, args),
         ('/api/startRegistration', StartRegistrationApiHandler, args),
         ('/api/stopRegistration', StopRegistrationApiHandler, args),
         ('/api/startQuestion', StartQuestionApiHandler, args),

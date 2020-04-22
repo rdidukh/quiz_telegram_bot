@@ -94,7 +94,7 @@ class QuizDb:
 
                 return new_update_id
 
-    def update_answer_points(self, *, quiz_id: str, question: int, team_id: int, points: int) -> int:
+    def set_answer_points(self, *, quiz_id: str, question: int, team_id: int, points: int) -> int:
         with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 (update_id, _) = self._select_answer(

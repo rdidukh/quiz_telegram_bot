@@ -114,6 +114,99 @@ class TestQuizHttpServer(BaseTestCase):
         self.assertIsNone(self.quiz.question)
 
 
+class SetAnswerPointsApiTest(BaseTestCase):
+    def test_updates_points(self):
+        self.quiz_db.set_answer_points = MagicMock(return_value=4)
+        request = {
+            'question': 4,
+            'team_id': 5001,
+            'points': 17,
+        }
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+        self.assertDictEqual({}, json.loads(response.body))
+        self.assertEqual(200, response.code)
+        self.quiz_db.set_answer_points.assert_called_with(
+            quiz_id='test', question=4, team_id=5001, points=17)
+
+    def test_non_existing_answer(self):
+        self.quiz_db.set_answer_points = MagicMock(return_value=0)
+        request = {
+            'question': 4,
+            'team_id': 5001,
+            'points': 17,
+        }
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('does not exist', json.loads(response.body)['error'])
+        self.assertEqual(400, response.code)
+        self.quiz_db.set_answer_points.assert_called_with(
+            quiz_id='test', question=4, team_id=5001, points=17)
+
+    def test_no_question_param(self):
+        request = {
+            'team_id': 5001,
+            'points': 17,
+        }
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+    def test_no_team_id_param(self):
+        request = {
+            'question': 4,
+            'points': 17,
+        }
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+    def test_no_points_param(self):
+        request = {
+            'question': 4,
+            'team_id': 5001,
+        }
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+    def test_question_param_not_int(self):
+        request = {
+            'question': '4',
+            'team_id': 5001,
+            'points': 17,
+        }
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+    def test_team_id_param_not_int(self):
+        request = {
+            'question': 4,
+            'team_id': '5001',
+            'points': 17,
+        }
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+    def test_points_param_not_int(self):
+        request = {
+            'question': 4,
+            'team_id': 5001,
+            'points': '17',
+        }
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+
 class GetUpdatesApiTest(BaseTestCase):
     def test_returns_updates(self):
         update_id = self.quiz.status_update_id
