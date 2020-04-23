@@ -157,7 +157,10 @@ class QuizController {
         const regStartButton = table.rows[3].cells[1].firstElementChild
         const regStopButton = table.rows[3].cells[2].firstElementChild
 
-        if (status.registration === true) {
+        if (status.question != null) {
+            regStartButton.classList.add('disabled')
+            regStopButton.classList.add('disabled')
+        } else if (status.registration === true) {
             regStartButton.classList.add('disabled')
             regStopButton.classList.remove('disabled')
         } else {
@@ -226,6 +229,21 @@ class QuizController {
         this.updateAnswersTable()
     }
 
+    updateStartStopQuestionButtons(status) {
+        const startButton = this.document.getElementById('start_question_button')
+        const stopButton = this.document.getElementById('stop_question_button')
+        if (status.registration === true) {
+            startButton.classList.add('disabled')
+            stopButton.classList.add('disabled')
+        } else if (status.question != null) {
+            startButton.classList.add('disabled')
+            stopButton.classList.remove('disabled')
+        } else {
+            startButton.classList.remove('disabled')
+            stopButton.classList.add('disabled')
+        }
+    }
+
     updateAnswersTable() {
         const table = this.document.getElementById('answers_table')
 
@@ -289,6 +307,7 @@ class QuizController {
             this.lastSeenStatusUpdateId = updates.status.update_id
             console.log('Status update received. update_id: ' + updates.status.update_id)
             this.updateStatusTable(updates.status)
+            this.updateStartStopQuestionButtons(updates.status)
         }
 
         // Update teams index.
