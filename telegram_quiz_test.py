@@ -149,6 +149,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         context = mock_callback_context()
         context.chat_data = {'typing_name': False}
 
+        self.quiz.start_registration()
         self.quiz._handle_registration_update(update, context)
 
         self.assertListEqual([], self.quiz_db.get_teams(quiz_id='test'))
@@ -165,6 +166,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         context = mock_callback_context()
         context.chat_data = {'typing_name': True}
 
+        self.quiz.start_registration()
         self.quiz._handle_registration_update(update, context)
 
         self.assertListEqual([
@@ -187,6 +189,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         context = mock_callback_context()
         context.chat_data = {'typing_name': True}
 
+        self.quiz.start_registration()
         self.quiz._handle_registration_update(update, context)
 
         self.assertListEqual([
@@ -208,6 +211,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         context = mock_callback_context()
         context.chat_data = {'typing_name': True}
 
+        self.quiz.start_registration()
         self.quiz._handle_registration_update(update, context)
 
         self.assertListEqual([
@@ -216,6 +220,10 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         ], self.quiz_db.get_teams(quiz_id='test'))
         self.assertNotIn('typing_name', context.chat_data)
         update.message.reply_text.assert_not_called()
+
+    def test_registration_not_started(self):
+        self.quiz._handle_registration_update(None, None)
+        self.assertListEqual([], self.quiz_db.get_teams(quiz_id='test'))
 
 
 class HandleAnswerUpdateTest(BaseTestCase):
@@ -306,6 +314,10 @@ class HandleAnswerUpdateTest(BaseTestCase):
                    team_id=5001, answer='Banana', timestamp=5),
         ], self.quiz_db.get_answers(quiz_id='test'))
         update.message.reply_text.assert_not_called()
+
+    def test_question_not_started(self):
+        self.quiz._handle_answer_update(update=None, context=None)
+        self.assertListEqual([], self.quiz_db.get_answers(quiz_id='test'))
 
 
 class GetStatusTest(BaseTestCase):
