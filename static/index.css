@@ -1,21 +1,45 @@
 table, th, td {
     border: 1px solid black;
     border-collapse: collapse;
+    font-family: sans-serif;
+    height: 1.8em;
 }
 
-.action_button {
-    font-size: 16;
-    width: 200;
-    margin-top: 10px;
-    border: '1px solid black'
+#status_table td {
+    text-align: center;
 }
 
-#answers_table td:first-child {
-    width: 10em
+#status_table td:first-child {
+    padding-left: 2px;
+    text-align: left;
+    width: 10em;
+}
+
+#results_table td {
+    width: 1.8em;
+    text-align: center; 
+    vertical-align: middle;
+}
+
+#results_table td:first-child, #answers_table td:first-child {
+    width: 10em;
+    padding-left: 2px;
+    text-align: left; 
+}
+
+#results_table tr:first-child td {
+    font-weight: bold;
+    text-align: center;
+}
+
+#results_table td:nth-child(2) {
+    width: 3em;
+    font-weight: bold;
 }
 
 #answers_table td:nth-child(2) {
-    width: 10em
+    width: 10em;
+    padding-left: 2px;
 }
 
 #answers_table th:first-child {

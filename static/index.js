@@ -100,7 +100,7 @@ class QuizController {
     constructor(document, api) {
         this.document = document
         this.api = api
-        this.numberOfQuestions = 30
+        this.numberOfQuestions = 24
         // teamId -> Team.
         this.teamsIndex = new Map()
         // question -> teamId -> Answer
