@@ -28,66 +28,13 @@ describe('InitResultsTable', () => {
         controller.init()
 
         const table = document.getElementById('results_table')
-        assert.equal(table.rows.length, 3)
+        assert.equal(table.rows.length, 1)
         assert.equal(table.rows[0].cells.length, 5)
 
         assert.equal(table.rows[0].cells[1].textContent, 'Total')
         assert.equal(table.rows[0].cells[2].textContent, '1')
         assert.equal(table.rows[0].cells[3].textContent, '2')
         assert.equal(table.rows[0].cells[4].textContent, '3')
-    });
-
-    it('#startQuestionButtons', async () => {
-        const indexHtml = fs.readFileSync('static/index.html')
-        const dom = new jsdom.JSDOM(indexHtml);
-        const document = dom.window.document
-        const numberOfQuestions = 3
-
-        const fetcher = new MockFetcher()
-        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
-        controller.numberOfQuestions = numberOfQuestions
-        controller.init()
-
-        const table = document.getElementById('results_table')
-        assert.equal(table.rows.length, numberOfQuestions)
-        assert.equal(table.rows[1].cells.length, numberOfQuestions + 2)
-
-        for (var q = 1; q <= numberOfQuestions; q++) {
-            const startButton = table.rows[1].cells[q + 1].firstChild
-            assert.equal(startButton.tagName, 'BUTTON')
-            assert.equal(startButton.textContent, '>')
-            await startButton.onclick()
-
-            args = fetcher.calls.slice(-1).pop()
-            assert.equal(args.url, '/api/startQuestion')
-            assert.deepEqual(JSON.parse(args.options.body), {
-                question: q
-            })
-        }
-    });
-
-    it('#showAnswersButtons', async () => {
-        const indexHtml = fs.readFileSync('static/index.html')
-        const dom = new jsdom.JSDOM(indexHtml);
-        const document = dom.window.document
-        const numberOfQuestions = 3
-
-        const controller = new index.QuizController(document)
-        controller.numberOfQuestions = numberOfQuestions
-        controller.init()
-
-        const table = document.getElementById('results_table')
-        assert.equal(table.rows.length, 3)
-        assert.equal(table.rows[1].cells.length, numberOfQuestions + 2)
-
-        for (var q = 1; q <= numberOfQuestions; q++) {
-            const showButton = table.rows[2].cells[q + 1].firstChild
-            assert.equal(showButton.tagName, 'BUTTON')
-            assert.equal(showButton.textContent, 'A')
-            await showButton.onclick()
-            assert.equal(controller.currentQuestion, q)
-            assert.equal(document.getElementById('question_span').textContent, q)
-        }
     });
 
     it('#startRegistrationButton', async () => {

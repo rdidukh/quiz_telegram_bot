@@ -169,29 +169,11 @@ class QuizController {
     initResultsTable() {
         const table = this.document.getElementById('results_table')
         const resultsTableHeaderRow = table.insertRow(0)
-        resultsTableHeaderRow.insertCell(-1)
+        resultsTableHeaderRow.insertCell(-1).textContent = 'Team'
         resultsTableHeaderRow.insertCell(-1).textContent = 'Total'
-
-        const resultsStartQuestionRow = table.insertRow(-1)
-        resultsStartQuestionRow.insertCell(-1)
-        resultsStartQuestionRow.insertCell(-1)
-
-        const showAnswersRow = table.insertRow(-1)
-        showAnswersRow.insertCell(-1)
-        showAnswersRow.insertCell(-1)
 
         for (let question = 1; question <= this.numberOfQuestions; question++) {
             resultsTableHeaderRow.insertCell(-1).textContent = question
-            const startQuestionButton = this.document.createElement('button')
-            startQuestionButton.textContent = '>'
-            startQuestionButton.onclick = () => { this.api.startQuestion(question) }
-
-            const showAnswersButton = this.document.createElement('button')
-            showAnswersButton.textContent = 'A'
-            showAnswersButton.onclick = async () => { this.showAnswersForQuestion(question) }
-
-            resultsStartQuestionRow.insertCell(-1).appendChild(startQuestionButton)
-            showAnswersRow.insertCell(-1).appendChild(showAnswersButton)
         }
     }
 
