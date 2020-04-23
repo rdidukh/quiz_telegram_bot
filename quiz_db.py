@@ -100,15 +100,18 @@ class QuizDb:
                 (update_id, _) = self._select_answer(
                     db=db, quiz_id=quiz_id, question=question, team_id=team_id)
 
-                if not update_id:
-                    return 0
-
                 new_update_id = self._get_next_answer_update_id(db)
 
-                db.execute('UPDATE answers '
-                           'SET update_id = ?, points = ? '
-                           'WHERE update_id = ?',
-                           (new_update_id, points, update_id))
+                if update_id:
+                    db.execute('UPDATE answers '
+                               'SET update_id = ?, points = ? '
+                               'WHERE update_id = ?',
+                               (new_update_id, points, update_id))
+                else:
+                    db.execute('INSERT INTO answers (update_id, quiz_id, question, team_id, answer, timestamp, points) '
+                               'VALUES (?, ?, ?, ?, "", 0, ?)',
+                               (new_update_id, quiz_id, question, team_id, points))
+
                 return new_update_id
 
     def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:

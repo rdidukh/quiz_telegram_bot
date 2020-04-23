@@ -192,34 +192,42 @@ class UpdateAnswerTest(BaseTestCase):
 class UpdateAnswerPointsTest(BaseTestCase):
 
     def test_updates_points(self):
-        self._insert_into_answers([dict(update_id=2, quiz_id='test', question=5, team_id=5001,
-                                        answer='Apple', timestamp=123, points=4)])
+        self._insert_into_answers([
+            dict(update_id=1, quiz_id='test', question=5, team_id=5001,
+                 answer='Apple', timestamp=123, points=9),
+            dict(update_id=2, quiz_id='test', question=4, team_id=5002,
+                 answer='Banana', timestamp=124, points=9),
+            dict(update_id=3, quiz_id='other', question=4, team_id=5001,
+                 answer='Carrot', timestamp=125, points=9),
+        ])
         update_id = self.quiz_db.set_answer_points(
             quiz_id='test', question=5, team_id=5001, points=7)
 
-        self.assertEqual(3, update_id)
+        self.assertEqual(4, update_id)
         self.assertListEqual([
-            (3, 'test', 5, 5001, 'Apple', 123, 7),
+            (2, 'test', 4, 5002, 'Banana', 124, 9),
+            (3, 'other', 4, 5001, 'Carrot', 125, 9),
+            (4, 'test', 5, 5001, 'Apple', 123, 7),
         ], self._select_answers())
-        self.assertEqual(3, self._get_last_answers_update_id())
 
     def test_non_existing_answer(self):
         self._insert_into_answers([
             dict(update_id=1, quiz_id='test', question=5, team_id=5001,
                  answer='Apple', timestamp=123, points=9),
             dict(update_id=2, quiz_id='test', question=4, team_id=5002,
-                 answer='Apple', timestamp=123, points=9),
+                 answer='Banana', timestamp=124, points=9),
             dict(update_id=3, quiz_id='other', question=4, team_id=5001,
-                 answer='Apple', timestamp=123, points=9),
+                 answer='Carrot', timestamp=125, points=9),
         ])
         update_id = self.quiz_db.set_answer_points(
             quiz_id='test', question=4, team_id=5001, points=7)
 
-        self.assertEqual(0, update_id)
+        self.assertEqual(4, update_id)
         self.assertListEqual([
             (1, 'test', 5, 5001, 'Apple', 123, 9),
-            (2, 'test', 4, 5002, 'Apple', 123, 9),
-            (3, 'other', 4, 5001, 'Apple', 123, 9)
+            (2, 'test', 4, 5002, 'Banana', 124, 9),
+            (3, 'other', 4, 5001, 'Carrot', 125, 9),
+            (4, 'test', 4, 5001, '', 0, 7),
         ], self._select_answers())
 
 
