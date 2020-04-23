@@ -61,7 +61,7 @@ class Api {
     async startQuestion(question) {
         try {
             await this.callServer('startQuestion', { question: question })
-            console.log('Question ' + question + 'started!')
+            console.log('Question ' + question + ' started!')
         } catch (error) {
             console.warn('Could not start question ' + question + ': ' + error)
         }
@@ -113,6 +113,38 @@ class QuizController {
 
     init() {
         this.initResultsTable()
+
+        this.document.getElementById('start_registration_button').onclick = async () => {
+            this.api.startRegistration()
+        }
+
+        this.document.getElementById('stop_registration_button').onclick = async () => {
+            this.api.stopRegistration()
+        }
+
+        this.document.getElementById('start_question_button').onclick = async () => {
+            this.api.startQuestion(this.currentQuestion)
+        }
+
+        this.document.getElementById('stop_question_button').onclick = async () => {
+            this.api.stopQuestion()
+        }
+
+        this.document.getElementById('previous_question_button').onclick = async () => {
+            var question = this.currentQuestion - 1
+            if (question <= 0) {
+                question = this.numberOfQuestions
+            }
+            this.showAnswersForQuestion(question)
+        }
+
+        this.document.getElementById('next_question_button').onclick = async () => {
+            var question = this.currentQuestion + 1
+            if (question > this.numberOfQuestions) {
+                question = 1
+            }
+            this.showAnswersForQuestion(question)
+        }
     }
 
     updateStatusTable(status) {
@@ -124,8 +156,6 @@ class QuizController {
 
         const regStartButton = table.rows[3].cells[1].firstElementChild
         const regStopButton = table.rows[3].cells[2].firstElementChild
-
-        console.log('reg: ' + status.registration)
 
         if (status.registration === true) {
             regStartButton.classList.add('disabled')
@@ -210,7 +240,7 @@ class QuizController {
 
     showAnswersForQuestion(question) {
         this.currentQuestion = question
-        this.document.querySelector('#answers_header span').textContent = question
+        this.document.getElementById('question_span').textContent = question
         this.updateAnswersTable()
     }
 
@@ -316,10 +346,8 @@ class QuizController {
     }
 }
 
-var api = null
-
 function onLoad() {
-    api = new Api(fetch.bind(window))
+    const api = new Api(fetch.bind(window))
     const controller = new QuizController(document, api)
     controller.init()
     controller.listenToServer()

@@ -86,8 +86,140 @@ describe('InitResultsTable', () => {
             assert.equal(showButton.textContent, 'A')
             await showButton.onclick()
             assert.equal(controller.currentQuestion, q)
-            assert.equal(document.querySelector('#answers_header span').textContent, q)
+            assert.equal(document.getElementById('question_span').textContent, q)
         }
+    });
+
+    it('#startRegistrationButton', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const fetcher = new MockFetcher()
+        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        controller.init()
+
+        const button = document.getElementById('start_registration_button')
+
+        await button.onclick()
+
+        args = fetcher.calls.slice(-1).pop()
+        assert.equal(args.url, '/api/startRegistration')
+        assert.deepEqual(JSON.parse(args.options.body), {})
+    });
+
+    it('#stopRegistrationButton', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const fetcher = new MockFetcher()
+        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        controller.init()
+
+        const button = document.getElementById('stop_registration_button')
+
+        await button.onclick()
+
+        args = fetcher.calls.slice(-1).pop()
+        assert.equal(args.url, '/api/stopRegistration')
+        assert.deepEqual(JSON.parse(args.options.body), {})
+    });
+
+    it('#startQuestionButton', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const fetcher = new MockFetcher()
+        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        controller.init()
+
+        const button = document.getElementById('start_question_button')
+
+        await button.onclick()
+
+        args = fetcher.calls.slice(-1).pop()
+        assert.equal(args.url, '/api/startQuestion')
+        assert.deepEqual(JSON.parse(args.options.body), {
+            question: 1
+        })
+
+        controller.currentQuestion = 17
+
+        await button.onclick()
+
+        args = fetcher.calls.slice(-1).pop()
+        assert.equal(args.url, '/api/startQuestion')
+        assert.deepEqual(JSON.parse(args.options.body), {
+            question: 17
+        })
+    });
+
+    it('#stopQuestionButton', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const fetcher = new MockFetcher()
+        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        controller.init()
+
+        const button = document.getElementById('stop_question_button')
+
+        await button.onclick()
+
+        args = fetcher.calls.slice(-1).pop()
+        assert.equal(args.url, '/api/stopQuestion')
+        assert.deepEqual(JSON.parse(args.options.body), {})
+    });
+
+    it('#previousQuestionButton', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const controller = new index.QuizController(document, new index.Api())
+        controller.init()
+        controller.currentQuestion = 7
+
+        const button = document.getElementById('previous_question_button')
+
+        await button.onclick()
+        assert.equal(controller.currentQuestion, 6)
+        assert.equal(document.getElementById('question_span').textContent, 6)
+
+        controller.currentQuestion = 1
+
+        await button.onclick()
+        assert.equal(controller.currentQuestion, controller.numberOfQuestions)
+        assert.equal(document.getElementById('question_span').textContent, controller.numberOfQuestions)
+    });
+
+    it('#nextQuestionButton', async () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        const controller = new index.QuizController(document, new index.Api())
+        controller.init()
+        controller.currentQuestion = 7
+
+        const button = document.getElementById('next_question_button')
+
+        await button.onclick()
+        assert.equal(controller.currentQuestion, 8)
+        assert.equal(document.getElementById('question_span').textContent, 8)
+
+        controller.currentQuestion = controller.numberOfQuestions - 1
+
+        await button.onclick()
+        assert.equal(controller.currentQuestion, controller.numberOfQuestions)
+        assert.equal(document.getElementById('question_span').textContent, controller.numberOfQuestions)
+
+        await button.onclick()
+        assert.equal(controller.currentQuestion, 1)
+        assert.equal(document.getElementById('question_span').textContent, 1)
     });
 });
 

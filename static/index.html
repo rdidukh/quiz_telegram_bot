@@ -23,10 +23,10 @@
         <tr>
             <td>Registration</td>
             <td>
-                <button class='green_text' onclick='api.startRegistration()'>&#x25B6;</button>
+                <button id='start_registration_button' class='green_text'>&#x25B6;</button>
             </td>
             <td>
-                <button class='red_text' onclick='api.stopRegistration()'>&#x25a0;</button>
+                <button id='stop_registration_button' class='red_text'>&#x25a0;</button>
             </td>
         </tr>
         <tr>
@@ -38,12 +38,13 @@
     <h2>Results</h2>
     <table id='results_table'></table>
 
-    <table id='status'></table>
-    <h2>Actions</h2>
-    <button class='action_button' id='stop_question_button' onclick='api.stopQuestion()'>Stop question</button>
-    <br />
-
-    <h2 id='answers_header'>Answers for question #<span>1</span></h2>
+    <h2>Question
+        <button id='previous_question_button'>&#x2B05;</button>
+        <span id='question_span'>1</span>
+        <button id='next_question_button'>&#x2B95;</button>
+        <button id='start_question_button' class='green_text'>&#x25B6;</button>
+        <button id='stop_question_button' class='red_text'>&#x25a0;</button></h2>
+    <h3 id='answers_header'>Answers</h3>
     <table id='answers_table'>
         <tr>
             <th>Team</th>
