@@ -77,7 +77,7 @@ describe('InitResultsTable', () => {
         controller.init()
 
         const table = document.getElementById('results_table')
-        assert.equal(table.rows.length, numberOfQuestions)
+        assert.equal(table.rows.length, 3)
         assert.equal(table.rows[1].cells.length, numberOfQuestions + 2)
 
         for (var q = 1; q <= numberOfQuestions; q++) {
@@ -121,6 +121,56 @@ describe('UpdateResultsTableTest', () => {
         assert.equal(table.rows[1].id, 'results_team_5001_row')
         assert.equal(table.rows[1].cells.length, 5)
         assert.equal(table.rows[1].cells[0].textContent, 'Austria')
+    });
+
+    it('#showsPoints', () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+        const numberOfQuestions = 4
+
+        const table = document.getElementById('results_table')
+        const row = table.insertRow(-1)
+        row.id = 'results_team_5002_row'
+        for (var i = 1; i <= numberOfQuestions + 2; i++) {
+            row.insertCell(-1).textContent = 'REMOVE'
+        }
+
+        const controller = new index.QuizController(document)
+        controller.numberOfQuestions = numberOfQuestions
+        controller.teamsIndex = new Map([
+            [5001, { name: 'Austria' }],
+            [5002, { name: 'Belgium' }],
+        ])
+        controller.answersIndex = new Map([
+            [1, new Map([
+                [5001, { answer: 'Apple', points: 6 }],
+                [5002, { answer: 'Banana', points: 3 }]
+            ])],
+            [3, new Map([
+                [5001, { answer: 'Ant', points: 9 }],
+                [5002, { answer: 'Bee' }]
+            ])],
+            [4, new Map([
+                [5002, { answer: 'Bread', points: 4 }],
+            ])],
+        ])
+
+        controller.updateResultsTable()
+
+        const austriaRow = table.querySelector('#results_team_5001_row')
+        assert.strictEqual(austriaRow.cells[1].textContent, '15')
+        assert.strictEqual(austriaRow.cells[2].textContent, '6')
+        assert.strictEqual(austriaRow.cells[3].textContent, '')
+        assert.strictEqual(austriaRow.cells[4].textContent, '9')
+        assert.strictEqual(austriaRow.cells[5].textContent, '')
+
+        const belgiumRow = table.querySelector('#results_team_5002_row')
+        assert.strictEqual(belgiumRow.cells[1].textContent, '7')
+        assert.strictEqual(belgiumRow.cells[2].textContent, '3')
+        assert.strictEqual(belgiumRow.cells[3].textContent, '')
+        assert.strictEqual(belgiumRow.cells[4].textContent, '')
+        assert.strictEqual(belgiumRow.cells[5].textContent, '4')
     });
 });
 

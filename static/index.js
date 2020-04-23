@@ -91,7 +91,7 @@ class Api {
 }
 
 function updateTextContent(element, newTextContent) {
-    if (element.textContent != newTextContent) {
+    if (element.textContent !== newTextContent) {
         element.textContent = newTextContent
     }
 }
@@ -166,10 +166,33 @@ class QuizController {
                 row.insertCell(-1)
                 row.insertCell(-1)
                 for (let q = 1; q <= this.numberOfQuestions; q++) {
-                    row.insertCell(-1).textContent = '0'
+                    row.insertCell(-1)
                 }
             }
+
+            var totalPoints = 0
+
+            for (let question = 1; question <= this.numberOfQuestions; question++) {
+                if (this.answersIndex.has(question)) {
+                    var answers = this.answersIndex.get(question)
+                    if (answers.has(teamId)) {
+                        var points = answers.get(teamId).points
+                    } else {
+                        var points = null
+                    }
+                } else {
+                    var points = null
+                }
+
+                if (points != null) {
+                    totalPoints += points
+                }
+
+                updateTextContent(row.cells[question + 1], points)
+            }
+
             updateTextContent(row.cells[0], team.name)
+            updateTextContent(row.cells[1], totalPoints)
         }
     }
 
@@ -215,11 +238,11 @@ class QuizController {
                 row.insertCell(-1).appendChild(wrongButton)
             }
 
-            if (!answers.has(teamId)) {
+            if (answers.has(teamId)) {
+                var answer = answers.get(teamId)
+            } else {
                 // No answer to the question for this team.
                 var answer = { text: '', points: null }
-            } else {
-                var answer = answers.get(teamId)
             }
 
             if (answer.points == null) {
