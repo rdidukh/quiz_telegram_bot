@@ -26,22 +26,22 @@ table, th, td {
     width: 10em
 }
 
-#answers_table button.correct_button {
-    color: green
-}
-
-#answers_table button.correct_button span {
-    content: '\u2714'
-}
-
-#answers_table button.wrong_button {
-    color: red
-}
-
 #answers_table td.correct_answer {
     background-color: lightgreen;
 }
 
 #answers_table td.wrong_answer {
     background-color: lightpink;
+}
+
+button.green_text {
+    color: green;
+}
+
+button.red_text {
+    color: red;
+}
+
+button.disabled {
+    color: lightgrey;
 }

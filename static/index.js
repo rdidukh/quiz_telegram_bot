@@ -120,8 +120,20 @@ class QuizController {
         updateTextContent(table.rows[0].cells[1], status.quiz_id)
         updateTextContent(table.rows[1].cells[1], status.language)
         updateTextContent(table.rows[2].cells[1], status.question)
-        updateTextContent(table.rows[3].cells[1], status.registration.toString())
         updateTextContent(table.rows[4].cells[1], status.time)
+
+        const regStartButton = table.rows[3].cells[1].firstElementChild
+        const regStopButton = table.rows[3].cells[2].firstElementChild
+
+        console.log('reg: ' + status.registration)
+
+        if (status.registration === true) {
+            regStartButton.classList.add('disabled')
+            regStopButton.classList.remove('disabled')
+        } else {
+            regStartButton.classList.remove('disabled')
+            regStopButton.classList.add('disabled')
+        }
     }
 
     initResultsTable() {
@@ -220,14 +232,14 @@ class QuizController {
 
                 const correctButton = this.document.createElement('button')
                 correctButton.textContent = correctAnswerButtonText
-                correctButton.classList.add('correct_button')
+                correctButton.classList.add('green_text')
                 correctButton.onclick = async () => {
                     this.api.setAnswerPoints(this.currentQuestion, teamId, 1)
                 }
 
                 const wrongButton = this.document.createElement('button')
                 wrongButton.textContent = wrongAnswerButtonText
-                wrongButton.classList.add('wrong_button')
+                wrongButton.classList.add('red_text')
                 wrongButton.onclick = async () => {
                     this.api.setAnswerPoints(this.currentQuestion, teamId, 0)
                 }

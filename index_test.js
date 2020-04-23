@@ -378,7 +378,7 @@ describe('ShowAnswersForQuestionTest', () => {
             for (var teamId = 5001; teamId <= 5002; teamId++) {
                 var button = document.querySelector('#answers_team_' + teamId + '_row').cells[2].firstChild
                 assert.equal(button.tagName, 'BUTTON')
-                assert.equal(button.classList.contains('correct_button'), true)
+                assert.equal(button.classList.contains('green_text'), true)
                 await button.onclick()
 
                 var args = fetcher.calls.slice(-1).pop()
@@ -416,7 +416,7 @@ describe('ShowAnswersForQuestionTest', () => {
             for (var teamId = 5001; teamId <= 5002; teamId++) {
                 var button = document.querySelector('#answers_team_' + teamId + '_row').cells[3].firstChild
                 assert.equal(button.tagName, 'BUTTON')
-                assert.equal(button.classList.contains('wrong_button'), true)
+                assert.equal(button.classList.contains('red_text'), true)
                 await button.onclick()
 
                 var args = fetcher.calls.slice(-1).pop()
@@ -437,13 +437,6 @@ describe('UpdateQuizTest', () => {
         const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
 
-        const statusTable = document.getElementById('status_table')
-        for (var i = 1; i <= 5; i++) {
-            const row = statusTable.insertRow(-1)
-            row.insertCell(-1)
-            row.insertCell(-1)
-        }
-
         const controller = new index.QuizController(document)
 
         controller.updateQuiz({
@@ -452,7 +445,7 @@ describe('UpdateQuizTest', () => {
                 quiz_id: 'test',
                 language: 'lang',
                 question: 4,
-                registration: true,
+                registration: false,
                 time: '2020-01-02 03:04:05'
             },
             teams: [
@@ -483,10 +476,78 @@ describe('UpdateQuizTest', () => {
 
         assert.equal(controller.currentQuestion, 1)
 
+        const statusTable = document.getElementById('status_table')
         assert.equal(statusTable.rows[0].cells[1].textContent, 'test')
         assert.equal(statusTable.rows[1].cells[1].textContent, 'lang')
         assert.equal(statusTable.rows[2].cells[1].textContent, '4')
-        assert.equal(statusTable.rows[3].cells[1].textContent, 'true')
         assert.equal(statusTable.rows[4].cells[1].textContent, '2020-01-02 03:04:05')
+    });
+
+    it('#registrationFalse', () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        var statusTable = document.getElementById('status_table')
+        var startButton = statusTable.rows[3].cells[1].firstElementChild
+
+        startButton.classList.add('disabled')
+
+        const controller = new index.QuizController(document)
+
+        controller.updateQuiz({
+            status: {
+                update_id: 123,
+                quiz_id: 'test',
+                language: 'lang',
+                question: 4,
+                registration: false,
+                time: '2020-01-02 03:04:05'
+            },
+            teams: [],
+            answers: []
+        })
+
+        var statusTable = document.getElementById('status_table')
+
+        var startButton = statusTable.rows[3].cells[1].firstElementChild
+        var stopButton = statusTable.rows[3].cells[2].firstElementChild
+
+        assert.equal(startButton.classList.contains('disabled'), false)
+        assert.equal(stopButton.classList.contains('disabled'), true)
+    });
+
+    it('#registrationTrue', () => {
+        const indexHtml = fs.readFileSync('static/index.html')
+        const dom = new jsdom.JSDOM(indexHtml);
+        const document = dom.window.document
+
+        var statusTable = document.getElementById('status_table')
+        var stopButton = statusTable.rows[3].cells[2].firstElementChild
+
+        stopButton.classList.add('disabled')
+
+        const controller = new index.QuizController(document)
+
+        controller.updateQuiz({
+            status: {
+                update_id: 123,
+                quiz_id: 'test',
+                language: 'lang',
+                question: 4,
+                registration: true,
+                time: '2020-01-02 03:04:05'
+            },
+            teams: [],
+            answers: []
+        })
+
+        var statusTable = document.getElementById('status_table')
+
+        var startButton = statusTable.rows[3].cells[1].firstElementChild
+        var stopButton = statusTable.rows[3].cells[2].firstElementChild
+
+        assert.equal(startButton.classList.contains('disabled'), true)
+        assert.equal(stopButton.classList.contains('disabled'), false)
     });
 });

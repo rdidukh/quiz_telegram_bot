@@ -10,23 +10,28 @@
     <table id='status_table'>
         <tr>
             <td>Quiz</td>
-            <td></td>
+            <td colspan='2'></td>
         </tr>
         <tr>
             <td>Language</td>
-            <td></td>
+            <td colspan='2'></td>
         </tr>
         <tr>
             <td>Question</td>
-            <td></td>
+            <td colspan='2'></td>
         </tr>
         <tr>
             <td>Registration</td>
-            <td></td>
+            <td>
+                <button class='green_text' onclick='api.startRegistration()'>&#x25B6;</button>
+            </td>
+            <td>
+                <button class='red_text' onclick='api.stopRegistration()'>&#x25a0;</button>
+            </td>
         </tr>
         <tr>
             <td>Last changed</td>
-            <td></td>
+            <td colspan='2'></td>
         </tr>
     </table>
 
@@ -35,12 +40,6 @@
 
     <table id='status'></table>
     <h2>Actions</h2>
-    <button class='action_button' id='start_registration_button' onclick='api.startRegistration()'>Start
-        registration</button>
-    <br />
-    <button class='action_button' id='stop_registration_button' onclick='api.stopRegistration()'>Stop
-        registration</button>
-    <br />
     <button class='action_button' id='stop_question_button' onclick='api.stopQuestion()'>Stop question</button>
     <br />
 
