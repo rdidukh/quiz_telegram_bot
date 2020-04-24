@@ -237,6 +237,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
             datetime.fromtimestamp(4),
             chat=telegram.Chat(5001, 'private'), text='Banana'))
         update.message.reply_text = MagicMock()
+        self.quiz.updater.dispatcher.run_async = MagicMock()
 
         self.quiz.start_question(question=1)
         self.quiz._handle_answer_update(update, context=None)
@@ -246,7 +247,9 @@ class HandleAnswerUpdateTest(BaseTestCase):
             Answer(quiz_id='test', question=1, team_id=5001,
                    answer='Banana', timestamp=4),
         ], self.quiz_db.get_answers(quiz_id='test'))
-        update.message.reply_text.assert_called_with('Confirmed: Banana.')
+
+        self.quiz.updater.dispatcher.run_async.assert_called_with(
+            update.message.reply_text, 'Confirmed: Banana.')
 
     @patch('telegram.ext.CallbackContext')
     def test_updates_answer(self, mock_callback_context):
@@ -260,6 +263,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
             datetime.fromtimestamp(4),
             chat=telegram.Chat(5001, 'private'), text='Banana'))
         update.message.reply_text = MagicMock()
+        self.quiz.updater.dispatcher.run_async = MagicMock()
 
         self.quiz.start_question(question=1)
         self.quiz._handle_answer_update(update, context=None)
@@ -272,7 +276,8 @@ class HandleAnswerUpdateTest(BaseTestCase):
 
         self.assertListEqual(
             expected_answers, self.quiz_db.get_answers(quiz_id='test'))
-        update.message.reply_text.assert_called_with('Confirmed: Banana.')
+        self.quiz.updater.dispatcher.run_async.assert_called_with(
+            update.message.reply_text, 'Confirmed: Banana.')
 
     @patch('telegram.ext.CallbackContext')
     def test_non_registered_team(self, mock_callback_context):

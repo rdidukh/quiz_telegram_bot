@@ -1,7 +1,6 @@
 import contextlib
 from datetime import datetime
 from dataclasses import dataclass, field
-import logging
 import sqlite3
 import threading
 from typing import Callable, List, Tuple, Optional, Set
@@ -44,7 +43,6 @@ class QuizDb:
         self.subscribers: Set[Callable[[], None]] = set()
 
     def _on_update(self):
-        logging.info(f'Number of subscribers: {len(self.subscribers)}')
         for sub in self.subscribers:
             sub()
 

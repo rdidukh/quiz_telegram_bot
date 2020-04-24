@@ -110,7 +110,7 @@ class TelegramQuiz:
                 context.chat_data['typing_name'] = True
                 message.reply_text(self.strings.registration_invitation)
         logging.info(
-            f'Registration update took {(time.time() - start_time):.6f} sec.')
+            f'Registration update took {1000*(time.time() - start_time):.3f} ms.')
 
     def start_registration(self):
         with self._lock:
@@ -172,14 +172,15 @@ class TelegramQuiz:
             )
 
             if update_id:
-                update.message.reply_text(
-                    self.strings.answer_confirmation.format(answer=answer))
+                reply = self.strings.answer_confirmation.format(answer=answer)
+                self.updater.dispatcher.run_async(
+                    update.message.reply_text, reply)
             else:
                 logging.warning(
                     f'Outdated answer. quiz_id: "{self.id}", question: {self.question}, '
                     'team_id: {chat_id}, answer: {answer}, time: {answer_time}')
         logging.info(
-            f'Answer update took {(time.time() - start_time):.6f} sec.')
+            f'Answer update took {1000*(time.time() - start_time):.3f} ms.')
 
     def start_question(self, question: int):
         with self._lock:
@@ -236,7 +237,7 @@ class TelegramQuiz:
         self.quiz_db.insert_message(Message(
             timestamp=timestamp, update_id=update_id, chat_id=chat_id, text=text))
         logging.info(
-            f'Log update took {(time.time() - start_time):.6f} sec.')
+            f'Log update took {1000*(time.time() - start_time):.3f} ms.')
 
     def _handle_error(self, update, context):
         logging.error('Update "%s" caused error "%s"', update, context.error)
@@ -250,6 +251,7 @@ class TelegramQuiz:
             self._on_status_update()
 
     def stop(self):
+        # TODO: clean up updater handlers.
         with self._lock:
             self.updater.stop()
             self._on_status_update()
