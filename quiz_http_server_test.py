@@ -318,6 +318,7 @@ class GetUpdatesApiTest(BaseTestCase):
         self.assertLess(time.time(), start_time + 3.0)
         self.assertIsNotNone(json.loads(response.body)['status'])
         self.assertEqual(200, response.code)
+        self.assertSetEqual(set(), self.quiz_db._subscribers)
 
     def test_long_polling_db_change(self):
         request = {
@@ -356,6 +357,7 @@ class GetUpdatesApiTest(BaseTestCase):
             'answers': [],
         }, json.loads(response.body))
         self.assertEqual(200, response.code)
+        self.assertSetEqual(set(), self.quiz_db._subscribers)
 
     def test_long_polling_instant_status_update(self):
         request = {
@@ -380,6 +382,7 @@ class GetUpdatesApiTest(BaseTestCase):
         self.assertListEqual([], updates['teams'])
         self.assertListEqual([], updates['answers'])
         self.assertEqual(200, response.code)
+        self.assertSetEqual(set(), self.quiz_db._subscribers)
 
     def test_long_polling_instant_db_update(self):
         request = {
@@ -410,6 +413,7 @@ class GetUpdatesApiTest(BaseTestCase):
             'answers': [],
         }, json.loads(response.body))
         self.assertEqual(200, response.code)
+        self.assertSetEqual(set(), self.quiz_db._subscribers)
 
     def test_long_polling_timeout(self):
         request = {
@@ -431,6 +435,7 @@ class GetUpdatesApiTest(BaseTestCase):
             'answers': [],
         }, json.loads(response.body))
         self.assertEqual(200, response.code)
+        self.assertSetEqual(set(), self.quiz_db._subscribers)
 
     def test_no_min_status_update_id_given(self):
         request = {

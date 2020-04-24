@@ -1,6 +1,7 @@
 import contextlib
 from datetime import datetime
 from dataclasses import dataclass, field
+import logging
 import sqlite3
 import threading
 from typing import Callable, List, Tuple, Optional, Set
@@ -38,13 +39,25 @@ class Team:
 class QuizDb:
     def __init__(self, *, db_path: str):
         self.db_path = db_path
-        self.lock = threading.RLock()
+        self._lock = threading.Lock()
+        self._db_lock = threading.Lock()
         self.create_if_not_exists()
-        self.subscribers: Set[Callable[[], None]] = set()
+        self._subscribers: Set[Callable[[], None]] = set()
 
     def _on_update(self):
-        for sub in self.subscribers:
-            sub()
+        for sub in self._subscribers:
+            try:
+                sub()
+            except Exception:
+                logging.exception('Subscriber raised an error.')
+
+    def add_updates_subscriber(self, callback: Callable[[], None]) -> None:
+        with self._lock:
+            self._subscribers.add(callback)
+
+    def remove_updates_subscriber(self, callback: Callable[[], None]) -> None:
+        with self._lock:
+            self._subscribers.remove(callback)
 
     def get_answers(self, quiz_id: str, *, min_update_id: int = 0) -> List[Answer]:
         answers: List[Answer] = []
@@ -76,7 +89,7 @@ class QuizDb:
         return update_id + 1 if update_id else 1
 
     def update_answer(self, *, quiz_id: str, question: int, team_id: int, answer: str, answer_time: int) -> int:
-        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
+        with self._db_lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 (update_id, timestamp,) = self._select_answer(
                     db=db, quiz_id=quiz_id, question=question, team_id=team_id)
@@ -101,7 +114,7 @@ class QuizDb:
                 return new_update_id
 
     def set_answer_points(self, *, quiz_id: str, question: int, team_id: int, points: int) -> int:
-        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
+        with self._db_lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 (update_id, _) = self._select_answer(
                     db=db, quiz_id=quiz_id, question=question, team_id=team_id)
@@ -122,7 +135,7 @@ class QuizDb:
                 return new_update_id
 
     def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:
-        with self.lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
+        with self._db_lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 (update_id, timestamp) = db.execute('SELECT update_id, timestamp FROM teams WHERE quiz_id = ? AND id = ?',
                                                     (quiz_id, team_id)).fetchone() or (0, 0)

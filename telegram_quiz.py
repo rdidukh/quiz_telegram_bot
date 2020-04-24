@@ -54,7 +54,7 @@ class TelegramQuiz:
         self.strings: Strings = self._get_strings(strings_file, language)
         self._status_update_id = 0
         self._lock = threading.Lock()
-        self.subscribers: Set[Callable[[], None]] = set()
+        self._subscribers: Set[Callable[[], None]] = set()
 
     def _get_strings(self, strings_file: str, language: str) -> Strings:
         try:
@@ -81,6 +81,14 @@ class TelegramQuiz:
             setattr(strings, string, obj[language][string])
 
         return strings
+
+    def add_updates_subscriber(self, callback: Callable[[], None]) -> None:
+        with self._lock:
+            self._subscribers.add(callback)
+
+    def remove_updates_subscriber(self, callback: Callable[[], None]) -> None:
+        with self._lock:
+            self._subscribers.remove(callback)
 
     def _handle_registration_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
         start_time = time.time()
@@ -258,8 +266,11 @@ class TelegramQuiz:
 
     def _on_status_update(self):
         self._status_update_id += 1
-        for sub in self.subscribers:
-            sub()
+        for sub in self._subscribers:
+            try:
+                sub()
+            except Exception:
+                logging.exception('Subscriber raised an error.')
 
     @property
     def status_update_id(self) -> int:

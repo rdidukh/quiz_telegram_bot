@@ -122,8 +122,8 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
         self.cond = threading.Condition()
 
         try:
-            self.quiz.subscribers.add(self._notify)
-            self.quiz.quiz_db.subscribers.add(self._notify)
+            self.quiz.add_updates_subscriber(self._notify)
+            self.quiz.quiz_db.add_updates_subscriber(self._notify)
 
             await tornado.ioloop.IOLoop.current().run_in_executor(None,
                                                                   functools.partial(self._wait, timeout=timeout))
@@ -133,8 +133,8 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
 
             return updates
         finally:
-            self.quiz.subscribers.remove(self._notify)
-            self.quiz.quiz_db.subscribers.remove(self._notify)
+            self.quiz.remove_updates_subscriber(self._notify)
+            self.quiz.quiz_db.remove_updates_subscriber(self._notify)
 
     def on_connection_close(self):
         logging.warning('Connection closed by the client.')

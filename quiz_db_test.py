@@ -2,6 +2,7 @@ from quiz_db import Answer, Message, QuizDb, Team
 import tempfile
 from typing import Any, Dict, List
 import unittest
+from unittest.mock import MagicMock
 import os
 import sqlite3
 
@@ -155,6 +156,9 @@ class QuizDbTest(BaseTestCase):
 
 class UpdateAnswerTest(BaseTestCase):
     def test_inserts_new_answer(self):
+        sub = MagicMock()
+        self.quiz_db.add_updates_subscriber(sub)
+
         update_id = self.quiz_db.update_answer(quiz_id='test', question=3, team_id=5001,
                                                answer='Unicode Юнікод 😎', answer_time=123)
 
@@ -163,8 +167,12 @@ class UpdateAnswerTest(BaseTestCase):
             (1, 'test', 3, 5001, 'Unicode Юнікод 😎', 123, None),
         ], self._select_answers())
         self.assertEqual(1, self._get_last_answers_update_id())
+        sub.assert_called_with()
 
     def test_updates_old_answer_and_resets_points(self):
+        sub = MagicMock()
+        self.quiz_db.add_updates_subscriber(sub)
+
         self._insert_into_answers([dict(update_id=2, quiz_id='test', question=5, team_id=5001,
                                         answer='Apple', timestamp=123, points=4)])
         update_id = self.quiz_db.update_answer(quiz_id='test', question=5, team_id=5001,
@@ -175,10 +183,14 @@ class UpdateAnswerTest(BaseTestCase):
             (3, 'test', 5, 5001, 'Unicode Юнікод 😎', 124, None),
         ], self._select_answers())
         self.assertEqual(3, self._get_last_answers_update_id())
+        sub.assert_called_with()
 
     def test_outdated_answer(self):
+        sub = MagicMock()
+        self.quiz_db.add_updates_subscriber(sub)
         self._insert_into_answers([dict(update_id=2, quiz_id='test', question=5, team_id=5001,
                                         answer='Apple', timestamp=123, points=4)])
+
         update_id = self.quiz_db.update_answer(quiz_id='test', question=5, team_id=5001,
                                                answer='Unicode Юнікод 😎', answer_time=122)
 
@@ -187,11 +199,14 @@ class UpdateAnswerTest(BaseTestCase):
             (2, 'test', 5, 5001, 'Apple', 123, 4),
         ], self._select_answers())
         self.assertEqual(2, self._get_last_answers_update_id())
+        sub.assert_not_called()
 
 
 class UpdateAnswerPointsTest(BaseTestCase):
 
     def test_updates_points(self):
+        sub = MagicMock()
+        self.quiz_db.add_updates_subscriber(sub)
         self._insert_into_answers([
             dict(update_id=1, quiz_id='test', question=5, team_id=5001,
                  answer='Apple', timestamp=123, points=9),
@@ -200,6 +215,7 @@ class UpdateAnswerPointsTest(BaseTestCase):
             dict(update_id=3, quiz_id='other', question=4, team_id=5001,
                  answer='Carrot', timestamp=125, points=9),
         ])
+
         update_id = self.quiz_db.set_answer_points(
             quiz_id='test', question=5, team_id=5001, points=7)
 
@@ -209,8 +225,11 @@ class UpdateAnswerPointsTest(BaseTestCase):
             (3, 'other', 4, 5001, 'Carrot', 125, 9),
             (4, 'test', 5, 5001, 'Apple', 123, 7),
         ], self._select_answers())
+        sub.assert_called_with()
 
     def test_non_existing_answer(self):
+        sub = MagicMock()
+        self.quiz_db.add_updates_subscriber(sub)
         self._insert_into_answers([
             dict(update_id=1, quiz_id='test', question=5, team_id=5001,
                  answer='Apple', timestamp=123, points=9),
@@ -229,10 +248,13 @@ class UpdateAnswerPointsTest(BaseTestCase):
             (3, 'other', 4, 5001, 'Carrot', 125, 9),
             (4, 'test', 4, 5001, '', 0, 7),
         ], self._select_answers())
+        sub.assert_called_with()
 
 
 class UpdateTeamTest(BaseTestCase):
     def test_inserts_new_team(self):
+        sub = MagicMock()
+        self.quiz_db.add_updates_subscriber(sub)
         prev_update_id = self._get_last_teams_update_id()
 
         update_id = self.quiz_db.update_team(
@@ -243,8 +265,11 @@ class UpdateTeamTest(BaseTestCase):
             (update_id, 'test', 5001, 'Unicode Юнікод 😎', 123),
         ], self._select_teams())
         self.assertEqual(update_id, self._get_last_teams_update_id())
+        sub.assert_called_with()
 
     def test_updates_team(self):
+        sub = MagicMock()
+        self.quiz_db.add_updates_subscriber(sub)
         self._insert_into_teams([
             dict(update_id=1, quiz_id='test',
                  id=5001, name='Apple', timestamp=12)
@@ -258,8 +283,11 @@ class UpdateTeamTest(BaseTestCase):
         self.assertListEqual([
             (update_id, 'test', 5001, 'Banana', 13),
         ], self._select_teams())
+        sub.assert_called_with()
 
     def test_outdated_registration(self):
+        sub = MagicMock()
+        self.quiz_db.add_updates_subscriber(sub)
         self._insert_into_teams([
             dict(update_id=1, quiz_id='test',
                  id=5001, name='Apple', timestamp=12)
@@ -274,6 +302,7 @@ class UpdateTeamTest(BaseTestCase):
             (1, 'test', 5001, 'Apple', 12),
         ], self._select_teams())
         self.assertEqual(prev_update_id, self._get_last_teams_update_id())
+        sub.assert_not_called()
 
 
 if __name__ == '__main__':
