@@ -35,6 +35,7 @@ class Api {
             min_status_update_id: minStatusUpdateId,
             min_teams_update_id: minTeamsUpdateId,
             min_answers_update_id: minAnswersUpdateId,
+            timeout: 30,
         })
 
         return response
@@ -83,7 +84,7 @@ class Api {
                 'team_id': teamId,
                 'points': points,
             })
-            console.log('Answer points for question ' + question + ' of team ' + teamId + ' set to ' + points)
+            console.log('Points for answer to question ' + question + ' of team ' + teamId + ' set to ' + points)
         } catch (error) {
             console.warn('Could not set answer points for question ' + question + ' of team ' + teamId + ': ' + error)
         }
@@ -305,7 +306,7 @@ class QuizController {
     updateQuiz(updates) {
         if (updates.status) {
             this.lastSeenStatusUpdateId = updates.status.update_id
-            console.log('Status update received. update_id: ' + updates.status.update_id)
+            console.log('Status update. update_id: ' + updates.status.update_id)
             this.updateStatusTable(updates.status)
             this.updateStartStopQuestionButtons(updates.status)
         }
@@ -314,7 +315,7 @@ class QuizController {
         for (const team of updates.teams) {
             this.lastSeenTeamsUpdateId = Math.max(this.lastSeenTeamsUpdateId, team.update_id)
             this.teamsIndex.set(team.id, team)
-            console.log('Team update received. Name: "' + team.name + '". Id: ' + team.id)
+            console.log('Team update. Name: "' + team.name + '". Id: ' + team.id)
         }
 
         // Update answers index.
@@ -324,7 +325,7 @@ class QuizController {
                 this.answersIndex.set(answer.question, new Map())
             }
             this.answersIndex.get(answer.question).set(answer.team_id, answer)
-            console.log('Answer update received. Question: ' + answer.question +
+            console.log('Answer update. Question: ' + answer.question +
                 '. Team Id: ' + answer.team_id + '. Answer: "' + answer.answer + '"')
         }
 
@@ -332,18 +333,29 @@ class QuizController {
         this.updateAnswersTable()
     }
 
-    getUpdates() {
-        this.api.getUpdates(
-            this.lastSeenStatusUpdateId + 1,
-            this.lastSeenTeamsUpdateId + 1,
-            this.lastSeenAnswersUpdateId + 1
-        ).then((updates) => {
-            this.updateQuiz(updates)
-        })
-    }
+    async listenToServer() {
+        var failedAttempts = 0
+        while (failedAttempts < 60) {
+            var updates = null
+            try {
+                updates = null
+                updates = await this.api.getUpdates(
+                    this.lastSeenStatusUpdateId + 1,
+                    this.lastSeenTeamsUpdateId + 1,
+                    this.lastSeenAnswersUpdateId + 1
+                )
 
-    listenToServer() {
-        setInterval(this.getUpdates.bind(this), 1000)
+                failedAttempts = 0
+            } catch (error) {
+                failedAttempts++
+                console.error('Could not get updates: ' + error)
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            if (updates != null) {
+                this.updateQuiz(updates)
+            }
+        }
+        console.error('Gave up after ' + failedAttempts + ' failed attempts.')
     }
 }
 

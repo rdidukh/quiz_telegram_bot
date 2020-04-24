@@ -1,9 +1,10 @@
 import contextlib
 from datetime import datetime
 from dataclasses import dataclass, field
+import logging
 import sqlite3
 import threading
-from typing import List, Tuple, Optional
+from typing import Callable, List, Tuple, Optional, Set
 
 
 @dataclass
@@ -40,6 +41,12 @@ class QuizDb:
         self.db_path = db_path
         self.lock = threading.RLock()
         self.create_if_not_exists()
+        self.subscribers: Set[Callable[[], None]] = set()
+
+    def _on_update(self):
+        logging.info(f'Number of subscribers: {len(self.subscribers)}')
+        for sub in self.subscribers:
+            sub()
 
     def get_answers(self, quiz_id: str, *, min_update_id: int = 0) -> List[Answer]:
         answers: List[Answer] = []
@@ -92,6 +99,7 @@ class QuizDb:
                                'VALUES (?, ?, ?, ?, ?, ?)',
                                (new_update_id, quiz_id, question, team_id, answer, answer_time))
 
+                self._on_update()
                 return new_update_id
 
     def set_answer_points(self, *, quiz_id: str, question: int, team_id: int, points: int) -> int:
@@ -112,6 +120,7 @@ class QuizDb:
                                'VALUES (?, ?, ?, ?, "", 0, ?)',
                                (new_update_id, quiz_id, question, team_id, points))
 
+                self._on_update()
                 return new_update_id
 
     def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:
@@ -134,6 +143,7 @@ class QuizDb:
                                '(update_id, quiz_id, id, name, timestamp)'
                                'VALUES (?, ?, ?, ?, ?)',
                                (new_update_id, quiz_id, team_id, name, registration_time))
+                self._on_update()
                 return new_update_id
 
     def get_teams(self, *, quiz_id: str, team_id: Optional[int] = None, min_update_id: int = 0) -> List[Team]:

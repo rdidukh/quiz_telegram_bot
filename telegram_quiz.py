@@ -7,7 +7,7 @@ import telegram.ext
 import telegram.update
 import threading
 import time
-from typing import List, Optional
+from typing import Callable, List, Optional, Set
 
 
 class TelegramQuizError(Exception):
@@ -54,6 +54,7 @@ class TelegramQuiz:
         self.strings: Strings = self._get_strings(strings_file, language)
         self._status_update_id = 0
         self._lock = threading.Lock()
+        self.subscribers: Set[Callable[[], None]] = set()
 
     def _get_strings(self, strings_file: str, language: str) -> Strings:
         try:
@@ -82,6 +83,7 @@ class TelegramQuiz:
         return strings
 
     def _handle_registration_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
+        start_time = time.time()
         with self._lock:
             if self.registration_handler is None:
                 return
@@ -107,6 +109,8 @@ class TelegramQuiz:
                     f'Requesting a team to send their name. chat_id: {chat_id}, quiz_id: "{self.id}"')
                 context.chat_data['typing_name'] = True
                 message.reply_text(self.strings.registration_invitation)
+        logging.info(
+            f'Registration update took {(time.time() - start_time):.6f} sec.')
 
     def start_registration(self):
         with self._lock:
@@ -144,10 +148,10 @@ class TelegramQuiz:
         return self.registration_handler is not None
 
     def _handle_answer_update(self, update: telegram.update.Update, context: telegram.ext.CallbackContext):
+        start_time = time.time()
         with self._lock:
             if self.question is None:
                 return
-            start_time = time.time()
             chat_id = update.message.chat_id
             answer = update.message.text
             answer_time = update.message.date.timestamp()
@@ -174,8 +178,8 @@ class TelegramQuiz:
                 logging.warning(
                     f'Outdated answer. quiz_id: "{self.id}", question: {self.question}, '
                     'team_id: {chat_id}, answer: {answer}, time: {answer_time}')
-            logging.info(
-                f'Answer update handler took {(time.time() - start_time):.6f} sec.')
+        logging.info(
+            f'Answer update took {(time.time() - start_time):.6f} sec.')
 
     def start_question(self, question: int):
         with self._lock:
@@ -216,6 +220,7 @@ class TelegramQuiz:
                 f'Question {self} for quiz "{self.id}" has stopped.')
 
     def _handle_log_update(self, update: telegram.update.Update, context):
+        start_time = time.time()
         update_id = update.update_id or 0
         message: telegram.message.Message = update.message
         if not message:
@@ -228,10 +233,10 @@ class TelegramQuiz:
 
         logging.info(
             f'message: timestamp:{timestamp}, chat_id:{chat_id}, text: "{text}"')
-        logging.info('Committing values to database...')
         self.quiz_db.insert_message(Message(
             timestamp=timestamp, update_id=update_id, chat_id=chat_id, text=text))
-        logging.info('Committing values to database done.')
+        logging.info(
+            f'Log update took {(time.time() - start_time):.6f} sec.')
 
     def _handle_error(self, update, context):
         logging.error('Update "%s" caused error "%s"', update, context.error)
@@ -251,6 +256,8 @@ class TelegramQuiz:
 
     def _on_status_update(self):
         self._status_update_id += 1
+        for sub in self.subscribers:
+            sub()
 
     @property
     def status_update_id(self) -> int:

@@ -4,9 +4,11 @@ from quiz_db import Answer, Team, QuizDb
 from quiz_http_server import create_quiz_tornado_app
 from telegram_quiz import QuizStatus, Updates, TelegramQuiz
 from telegram_quiz_test import STRINGS
-import tempfile
-import tornado.testing
 import telegram
+import tempfile
+import threading
+import time
+import tornado.testing
 from typing import Any, Dict
 import unittest
 from unittest.mock import MagicMock
@@ -290,6 +292,146 @@ class GetUpdatesApiTest(BaseTestCase):
         self.quiz.quiz_db.get_answers.assert_called_with(
             quiz_id='test', min_update_id=789)
 
+    def test_long_polling_status_change(self):
+        request = {
+            'min_status_update_id': 1,
+            'min_teams_update_id': 1,
+            'min_answers_update_id': 1,
+            'timeout': 3.0,
+        }
+
+        def _change_status():
+            time.sleep(0.5)
+            self.quiz.start_registration()
+
+        start_time = time.time()
+
+        thread = threading.Thread(target=_change_status)
+        thread.start()
+
+        response = self.fetch('/api/getUpdates', method='POST',
+                              body=json.dumps(request))
+
+        thread.join()
+
+        self.assertGreater(time.time(), start_time+0.5)
+        self.assertLess(time.time(), start_time + 3.0)
+        self.assertIsNotNone(json.loads(response.body)['status'])
+        self.assertEqual(200, response.code)
+
+    def test_long_polling_db_change(self):
+        request = {
+            'min_status_update_id': 1,
+            'min_teams_update_id': 1,
+            'min_answers_update_id': 1,
+            'timeout': 3.0,
+        }
+
+        def _change_status():
+            time.sleep(0.5)
+            self.quiz_db.update_team(
+                quiz_id='test', team_id=5001, name='Liverpool', registration_time=123)
+
+        start_time = time.time()
+
+        thread = threading.Thread(target=_change_status)
+        thread.start()
+
+        response = self.fetch('/api/getUpdates', method='POST',
+                              body=json.dumps(request))
+
+        thread.join()
+
+        self.assertGreater(time.time(), start_time+0.5)
+        self.assertLess(time.time(), start_time + 3.0)
+        self.assertDictEqual({
+            'status': None,
+            'teams': [{
+                'quiz_id': 'test',
+                'update_id': 1,
+                'id': 5001,
+                'name': 'Liverpool',
+                'timestamp': 123,
+            }],
+            'answers': [],
+        }, json.loads(response.body))
+        self.assertEqual(200, response.code)
+
+    def test_long_polling_instant_status_update(self):
+        request = {
+            'min_status_update_id': 1,
+            'min_teams_update_id': 1,
+            'min_answers_update_id': 1,
+            'timeout': 3.0,
+        }
+
+        self.quiz.start_registration()
+
+        start_time = time.time()
+
+        response = self.fetch('/api/getUpdates', method='POST',
+                              body=json.dumps(request))
+
+        self.assertLess(time.time(), start_time + 0.5)
+        updates = json.loads(response.body)
+        self.assertListEqual(
+            ['status', 'teams', 'answers'], list(updates.keys()))
+        self.assertEqual(True, updates['status']['registration'])
+        self.assertListEqual([], updates['teams'])
+        self.assertListEqual([], updates['answers'])
+        self.assertEqual(200, response.code)
+
+    def test_long_polling_instant_db_update(self):
+        request = {
+            'min_status_update_id': 1,
+            'min_teams_update_id': 1,
+            'min_answers_update_id': 1,
+            'timeout': 3.0,
+        }
+
+        self.quiz_db.update_team(
+            quiz_id='test', team_id=5001, name='Liverpool', registration_time=123)
+
+        start_time = time.time()
+
+        response = self.fetch('/api/getUpdates', method='POST',
+                              body=json.dumps(request))
+
+        self.assertLess(time.time(), start_time + 0.5)
+        self.assertDictEqual({
+            'status': None,
+            'teams': [{
+                'quiz_id': 'test',
+                'update_id': 1,
+                'id': 5001,
+                'name': 'Liverpool',
+                'timestamp': 123,
+            }],
+            'answers': [],
+        }, json.loads(response.body))
+        self.assertEqual(200, response.code)
+
+    def test_long_polling_timeout(self):
+        request = {
+            'min_status_update_id': 2,
+            'min_teams_update_id': 1,
+            'min_answers_update_id': 1,
+            'timeout': 0.5,
+        }
+
+        self.quiz.start_registration()
+
+        start_time = time.time()
+        response = self.fetch('/api/getUpdates', method='POST',
+                              body=json.dumps(request))
+        self.assertGreater(time.time(), start_time+0.5)
+        self.assertDictEqual({
+            'status': None,
+            'teams': [],
+            'answers': [],
+        }, json.loads(response.body))
+        self.assertEqual(200, response.code)
+
     def test_no_min_status_update_id_given(self):
         request = {
             'min_teams_update_id': 456,
@@ -320,8 +462,6 @@ class GetUpdatesApiTest(BaseTestCase):
         self.assertEqual(400, response.code)
         self.assertIn('error', json.loads(response.body))
 
-###
-
     def test_no_min_status_update_id_not_int(self):
         request = {
             'min_status_update_id': '123',
@@ -349,6 +489,18 @@ class GetUpdatesApiTest(BaseTestCase):
             'min_status_update_id': 123,
             'min_teams_update_id': 456,
             'min_answers_update_id': '789',
+        }
+        response = self.fetch(
+            '/api/getUpdates', method='POST', body=json.dumps(request))
+        self.assertEqual(400, response.code)
+        self.assertIn('error', json.loads(response.body))
+
+    def test_timeout_not_float(self):
+        request = {
+            'min_status_update_id': 123,
+            'min_teams_update_id': 456,
+            'min_answers_update_id': 789,
+            'timeout': '0.5',
         }
         response = self.fetch(
             '/api/getUpdates', method='POST', body=json.dumps(request))

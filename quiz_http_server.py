@@ -1,11 +1,13 @@
+import functools
 import json
 import logging
 from telegram_quiz import TelegramQuiz, TelegramQuizError
+import threading
 import tornado.httpserver
 import tornado.ioloop
 import tornado.netutil
 import tornado.web
-from typing import Any, Dict, Type
+from typing import Any, Dict, Optional, Type
 
 
 class RequestParameterError(Exception):
@@ -21,19 +23,22 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
     def initialize(self, quiz: TelegramQuiz):
         self.quiz = quiz
 
-    def get_param_value(self, request: Dict[str, Any], param: str, param_type: Type) -> Any:
+    def get_param_value(self, request: Dict[str, Any], param: str, param_type: Type, default: Optional[Any] = None) -> Any:
         if param not in request:
-            raise RequestParameterError(f'Parameter {param} must be provided.')
+            if default is None:
+                raise RequestParameterError(
+                    f'Parameter {param} must be provided.')
+            return default
         value = request[param]
         if not isinstance(value, param_type):
             raise RequestParameterError(
                 f'Parameter {param} must be of type {param_type}.')
         return value
 
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         return {}
 
-    def post(self):
+    async def post(self):
         try:
             if self.request.body:
                 request = json.loads(self.request.body, encoding='utf-8')
@@ -46,7 +51,7 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
             return
 
         try:
-            response = self.handle_quiz_request(request)
+            response = await self.handle_quiz_request(request)
             status_code = 400 if response.get('error') else 200
         except (RequestParameterError, TelegramQuizError) as e:
             response = {'error': str(e)}
@@ -63,14 +68,15 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
 
 class GetUpdatesApiHandler(BaseQuizRequestHandler):
 
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        min_status_update_id = self.get_param_value(
-            request, 'min_status_update_id', int)
-        min_teams_update_id = self.get_param_value(
-            request, 'min_teams_update_id', int)
-        min_answers_update_id = self.get_param_value(
-            request, 'min_answers_update_id', int)
+    def _wait(self, *, timeout: float) -> bool:
+        with self.cond:
+            return self.cond.wait(timeout=timeout)
 
+    def _notify(self):
+        with self.cond:
+            self.cond.notify()
+
+    def _get_updates(self, min_status_update_id: int, min_teams_update_id: int, min_answers_update_id: int) -> Dict[str, Any]:
         if self.quiz.status_update_id >= min_status_update_id:
             status = self.quiz.get_status()
         else:
@@ -86,9 +92,48 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
             'answers': [a.__dict__ for a in answers],
         }
 
+    def _updates_empty(self, updates: Dict[str, Any]) -> bool:
+        return not updates.get('status') and not updates.get('teams') and not updates.get('answers')
+
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        min_status_update_id = self.get_param_value(
+            request, 'min_status_update_id', int)
+        min_teams_update_id = self.get_param_value(
+            request, 'min_teams_update_id', int)
+        min_answers_update_id = self.get_param_value(
+            request, 'min_answers_update_id', int)
+        timeout = self.get_param_value(request, 'timeout', float, 0.0)
+        timeout = min(timeout, 30.0)
+
+        updates = self._get_updates(
+            min_status_update_id, min_teams_update_id, min_answers_update_id)
+        if not self._updates_empty(updates) or timeout <= 0:
+            return updates
+
+        self.cond = threading.Condition()
+
+        try:
+            self.quiz.subscribers.add(self._notify)
+            self.quiz.quiz_db.subscribers.add(self._notify)
+
+            await tornado.ioloop.IOLoop.current().run_in_executor(None,
+                                                                  functools.partial(self._wait, timeout=timeout))
+
+            updates = self._get_updates(
+                min_status_update_id, min_teams_update_id, min_answers_update_id)
+
+            return updates
+        finally:
+            self.quiz.subscribers.remove(self._notify)
+            self.quiz.quiz_db.subscribers.remove(self._notify)
+
+    def on_connection_close(self):
+        logging.warning('Connection closed by the client.')
+        self._notify()
+
 
 class SetAnswerPointsApiHandler(BaseQuizRequestHandler):
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         question = self.get_param_value(request, 'question', int)
         team_id = self.get_param_value(request, 'team_id', int)
         points = self.get_param_value(request, 'points', int)
@@ -106,19 +151,19 @@ class SetAnswerPointsApiHandler(BaseQuizRequestHandler):
 
 
 class StartRegistrationApiHandler(BaseQuizRequestHandler):
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         self.quiz.start_registration()
         return {}
 
 
 class StopRegistrationApiHandler(BaseQuizRequestHandler):
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         self.quiz.stop_registration()
         return {}
 
 
 class StartQuestionApiHandler(BaseQuizRequestHandler):
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         question = request.get('question')
         if question is None:
             return {'error': 'Parameter question was not provided.'}
@@ -129,7 +174,7 @@ class StartQuestionApiHandler(BaseQuizRequestHandler):
 
 
 class StopQuestionApiHandler(BaseQuizRequestHandler):
-    def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         self.quiz.stop_question()
         return {}
 
