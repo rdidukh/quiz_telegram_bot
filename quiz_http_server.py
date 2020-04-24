@@ -7,7 +7,7 @@ import tornado.httpserver
 import tornado.ioloop
 import tornado.netutil
 import tornado.web
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Tuple, Type, Union
 
 
 class RequestParameterError(Exception):
@@ -23,7 +23,15 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
     def initialize(self, quiz: TelegramQuiz):
         self.quiz = quiz
 
-    def get_param_value(self, request: Dict[str, Any], param: str, param_type: Type, default: Optional[Any] = None) -> Any:
+    def get_param_value(self,
+                        request: Dict[str, Any],
+                        param: str,
+                        param_type: Union[Type, Tuple[Type, ...]],
+                        default: Optional[Any] = None) -> Any:
+
+        if not isinstance(param_type, tuple):
+            param_type = (param_type,)
+
         if param not in request:
             if default is None:
                 raise RequestParameterError(
@@ -31,8 +39,9 @@ class BaseQuizRequestHandler(tornado.web.RequestHandler):
             return default
         value = request[param]
         if not isinstance(value, param_type):
+            str_types = ' or '.join((t.__name__ for t in param_type))
             raise RequestParameterError(
-                f'Parameter {param} must be of type {param_type}.')
+                f'Parameter {param} must be of type {str_types}.')
         return value
 
     async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
@@ -102,7 +111,7 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
             request, 'min_teams_update_id', int)
         min_answers_update_id = self.get_param_value(
             request, 'min_answers_update_id', int)
-        timeout = self.get_param_value(request, 'timeout', float, 0.0)
+        timeout = self.get_param_value(request, 'timeout', (float, int), 0.0)
         timeout = min(timeout, 30.0)
 
         updates = self._get_updates(

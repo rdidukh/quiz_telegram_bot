@@ -297,7 +297,7 @@ class GetUpdatesApiTest(BaseTestCase):
             'min_status_update_id': 1,
             'min_teams_update_id': 1,
             'min_answers_update_id': 1,
-            'timeout': 3.0,
+            'timeout': 3,
         }
 
         def _change_status():
@@ -324,7 +324,7 @@ class GetUpdatesApiTest(BaseTestCase):
             'min_status_update_id': 1,
             'min_teams_update_id': 1,
             'min_answers_update_id': 1,
-            'timeout': 3.0,
+            'timeout': 3,
         }
 
         def _change_status():
@@ -386,7 +386,7 @@ class GetUpdatesApiTest(BaseTestCase):
             'min_status_update_id': 1,
             'min_teams_update_id': 1,
             'min_answers_update_id': 1,
-            'timeout': 3.0,
+            'timeout': 3,
         }
 
         self.quiz_db.update_team(
@@ -495,7 +495,7 @@ class GetUpdatesApiTest(BaseTestCase):
         self.assertEqual(400, response.code)
         self.assertIn('error', json.loads(response.body))
 
-    def test_timeout_not_float(self):
+    def test_timeout_not_float_or_int(self):
         request = {
             'min_status_update_id': 123,
             'min_teams_update_id': 456,
