@@ -23,10 +23,10 @@
         <tr>
             <td>Registration</td>
             <td>
-                <button id='start_registration_button' class='green_text'>&#x25B6;</button>
+                <button id='start_registration_button' class='registration_button green_text disabled'>&#x25B6;</button>
             </td>
             <td>
-                <button id='stop_registration_button' class='red_text'>&#x25a0;</button>
+                <button id='stop_registration_button' class='registration_button red_text disabled'>&#x25a0;</button>
             </td>
         </tr>
         <tr>
@@ -39,21 +39,27 @@
     <table id='results_table'></table>
 
     <h2>Question
-        <button id='previous_question_button'>&#x2B05;</button>
         <span id='question_span'>1</span>
-        <button id='next_question_button'>&#x2B95;</button>
     </h2>
-    <button id='start_question_button' class='green_text'>&#x25B6;</button>
-    <button id='stop_question_button' class='red_text'>&#x25a0;</button>
-    <br /><br />
-    <table id='answers_table'>
-        <tr>
-            <th>Team</th>
-            <th>Answer</th>
-            <th>&#x2714</th>
-            <th>&#x2716</th>
-        </tr>
-    </table>
+    <div style='width: 30em'>
+        <div style='float: left;'>
+            <button id='start_question_button' class='question_button green_text disabled'>&#x25B6;</button>
+            <button id='stop_question_button' class='question_button red_text disabled'>&#x25a0;</button>
+        </div>
+        <div style='float: right;'>
+            <button id='previous_question_button' class='question_button black_text'>&#x2B05;</button>
+            <button id='next_question_button' class='question_button black_text'>&#x2B95;</button>
+        </div>
+        <br /><br />
+        <table id='answers_table' style='width: 100%;'>
+            <tr>
+                <th>Team</th>
+                <th>Answer</th>
+                <th>&#x2714</th>
+                <th>&#x2716</th>
+            </tr>
+        </table>
+    </div>
 
     <script type='text/javascript' src='index.js'></script>
 </body>
