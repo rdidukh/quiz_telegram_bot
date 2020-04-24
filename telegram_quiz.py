@@ -102,6 +102,9 @@ class TelegramQuiz:
                 del context.chat_data['typing_name']
                 text = update.message.text
                 registration_time = update.message.date.timestamp()
+
+                text = ' '.join(text.split())[:30]
+
                 logging.info(
                     f'Registration message. chat_id: {chat_id}, quiz_id: "{self.id}", name: "{text}"')
                 update_id = self.quiz_db.update_team(
@@ -163,6 +166,9 @@ class TelegramQuiz:
             chat_id = update.message.chat_id
             answer = update.message.text
             answer_time = update.message.date.timestamp()
+
+            answer = ' '.join(answer.split())[:50]
+
             teams = self.quiz_db.get_teams(quiz_id=self.id, team_id=chat_id)
             if not teams:
                 return

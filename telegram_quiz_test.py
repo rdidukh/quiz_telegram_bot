@@ -161,7 +161,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
             datetime.fromtimestamp(123),
-            chat=telegram.Chat(5001, 'private'), text='Unicode Юнікод 😎'))
+            chat=telegram.Chat(5001, 'private'), text='\n  Unicode   \n    \n\n Юнікод\n 😎  \n \n'))
         update.message.reply_text = MagicMock()
         context = mock_callback_context()
         context.chat_data = {'typing_name': True}
@@ -235,7 +235,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
             datetime.fromtimestamp(4),
-            chat=telegram.Chat(5001, 'private'), text='Banana'))
+            chat=telegram.Chat(5001, 'private'), text=' \nUnicode\n Юнікод  😎   \n\n  '))
         update.message.reply_text = MagicMock()
         self.quiz.updater.dispatcher.run_async = MagicMock()
 
@@ -245,11 +245,11 @@ class HandleAnswerUpdateTest(BaseTestCase):
 
         self.assertListEqual([
             Answer(quiz_id='test', question=1, team_id=5001,
-                   answer='Banana', timestamp=4),
+                   answer='Unicode Юнікод 😎', timestamp=4),
         ], self.quiz_db.get_answers(quiz_id='test'))
 
         self.quiz.updater.dispatcher.run_async.assert_called_with(
-            update.message.reply_text, 'Confirmed: Banana.')
+            update.message.reply_text, 'Confirmed: Unicode Юнікод 😎.')
 
     @patch('telegram.ext.CallbackContext')
     def test_updates_answer(self, mock_callback_context):
