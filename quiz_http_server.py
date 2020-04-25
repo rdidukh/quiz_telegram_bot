@@ -141,6 +141,13 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
         self._notify()
 
 
+class SendResultsApiHandler(BaseQuizRequestHandler):
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        team_id = self.get_param_value(request, 'team_id', int)
+        self.quiz.send_results(team_id=team_id)
+        return {}
+
+
 class SetAnswerPointsApiHandler(BaseQuizRequestHandler):
     async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         question = self.get_param_value(request, 'question', int)
@@ -193,6 +200,7 @@ def create_quiz_tornado_app(*, quiz: TelegramQuiz) -> tornado.web.Application:
     return tornado.web.Application([
         ('/', RootHandler),
         ('/api/getUpdates', GetUpdatesApiHandler, args),
+        ('/api/sendResults', SendResultsApiHandler, args),
         ('/api/setAnswerPoints', SetAnswerPointsApiHandler, args),
         ('/api/startRegistration', StartRegistrationApiHandler, args),
         ('/api/stopRegistration', StopRegistrationApiHandler, args),

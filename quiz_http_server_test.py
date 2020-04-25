@@ -513,5 +513,34 @@ class GetUpdatesApiTest(BaseTestCase):
         self.assertIn('error', json.loads(response.body))
 
 
+class SendResultsApiTest(BaseTestCase):
+    def test_sends_results(self):
+        self.quiz.send_results = MagicMock()
+        request = {'team_id': 5001}
+        response = self.fetch('/api/sendResults', method='POST',
+                              body=json.dumps(request))
+        self.assertDictEqual({}, json.loads(response.body))
+        self.assertEqual(200, response.code)
+        self.quiz.send_results.assert_called_with(team_id=5001)
+
+    def test_no_team_id(self):
+        self.quiz.send_results = MagicMock()
+        request = {}
+        response = self.fetch('/api/sendResults', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+        self.quiz.send_results.assert_not_called()
+
+    def test_team_id_not_int(self):
+        self.quiz.send_results = MagicMock()
+        request = {'team_id': '5001'}
+        response = self.fetch('/api/sendResults', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+        self.quiz.send_results.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()
