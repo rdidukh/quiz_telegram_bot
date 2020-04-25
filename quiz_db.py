@@ -59,14 +59,30 @@ class QuizDb:
         with self._lock:
             self._subscribers.remove(callback)
 
-    def get_answers(self, quiz_id: str, *, min_update_id: int = 0) -> List[Answer]:
+    def get_answers(self, quiz_id: str, *, team_id: Optional[int] = None, min_update_id: int = 0) -> List[Answer]:
+        conditions = []
+        params = []
+
+        if quiz_id:
+            conditions.append('quiz_id = ?')
+            params.append(quiz_id)
+
+        if min_update_id:
+            conditions.append('update_id >= ?')
+            params.append(min_update_id)
+
+        if team_id is not None:
+            conditions.append('team_id = ?')
+            params.append(team_id)
+
+        condition = 'WHERE ' + ' AND '.join(conditions) if conditions else ''
+
         answers: List[Answer] = []
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 cursor = db.execute(
                     'SELECT update_id, quiz_id, question, team_id, answer, timestamp, points FROM answers '
-                    'WHERE quiz_id = ? AND update_id >= ?',
-                    (quiz_id, min_update_id))
+                    f'{condition}', params)
 
                 for (update_id, quiz_id, question, team_id, answer, timestamp, points) in cursor:
                     answers.append(Answer(update_id=update_id,
@@ -179,8 +195,7 @@ class QuizDb:
         with contextlib.closing(sqlite3.connect(self.db_path)) as db:
             with db:
                 cursor = db.execute('SELECT update_id, quiz_id, id, name, timestamp '
-                                    f'FROM teams {condition} '
-                                    'GROUP BY id', params)
+                                    f'FROM teams {condition}', params)
                 for (update_id, quiz_id, id, name, timestamp) in cursor:
                     teams.append(Team(
                         update_id=update_id,

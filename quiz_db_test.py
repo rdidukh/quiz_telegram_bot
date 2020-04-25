@@ -129,7 +129,11 @@ class QuizDbTest(BaseTestCase):
             quiz_id='test', min_update_id=5)
         self.assertListEqual(sorted([]), sorted(teams))
 
-    def test_get_answers(self):
+
+class GetAnswersSanityTest(BaseTestCase):
+
+    def setUp(self):
+        super().setUp()
         self._insert_into_answers([
             dict(update_id=2, quiz_id='test', question=5, team_id=5001,
                  answer='Apple', timestamp=123, points=4),
@@ -138,6 +142,8 @@ class QuizDbTest(BaseTestCase):
             dict(update_id=4, quiz_id='test', question=9, team_id=5002,
                  answer='Unicode Юнікод 😎', timestamp=34, points=None),
         ])
+
+    def test_gets_answers(self):
         answers = self.quiz_db.get_answers('test')
 
         self.assertListEqual(sorted([
@@ -147,11 +153,65 @@ class QuizDbTest(BaseTestCase):
                    answer='Apple', timestamp=123, points=4),
         ]), sorted(answers))
 
+    def test_min_update_id(self):
         answers = self.quiz_db.get_answers('test', min_update_id=3)
+
         self.assertListEqual(sorted([
             Answer(quiz_id='test', question=9, team_id=5002,
                    answer='Unicode Юнікод 😎', timestamp=34),
         ]), sorted(answers))
+
+    def test_team_id(self):
+        answers = self.quiz_db.get_answers('test', team_id=5001)
+
+        self.assertListEqual(sorted([
+            Answer(update_id=2, quiz_id='test', question=5, team_id=5001,
+                   answer='Apple', timestamp=123, points=4),
+        ]), sorted(answers))
+
+
+class GetAnswersManyItemsTest(BaseTestCase):
+
+    def setUp(self):
+        super().setUp()
+        update_id = 0
+        answers: List[Answer] = []
+        for quiz_id in range(1, 11):
+            for team_id in range(1, 51):
+                for question in range(1, 31):
+                    update_id += 1
+                    answers.append(dict(update_id=update_id, quiz_id=f'quiz{quiz_id}', question=question,
+                                        team_id=5000+team_id, answer=f'Answer {quiz_id}', timestamp=1000+update_id,
+                                        points=question % 2))
+        self._insert_into_answers(answers)
+
+    def test_all_answers(self):
+        answers = self.quiz_db.get_answers(quiz_id='quiz5')
+        self.assertEqual(1500, len(answers))
+        self.assertEqual(
+            1500, len([a for a in answers if a.quiz_id == 'quiz5']))
+        self.assertEqual(30, len([a for a in answers if a.team_id == 5010]))
+        self.assertEqual(50, len([a for a in answers if a.question == 7]))
+        self.assertEqual(750, len([a for a in answers if a.points == 1]))
+
+    def test_team_id(self):
+        answers = self.quiz_db.get_answers(quiz_id='quiz9', team_id=5024)
+        self.assertEqual(30, len(answers))
+        self.assertEqual(
+            30, len([a for a in answers if a.quiz_id == 'quiz9']))
+        self.assertEqual(30, len([a for a in answers if a.team_id == 5024]))
+        self.assertEqual(1, len([a for a in answers if a.question == 7]))
+        self.assertEqual(15, len([a for a in answers if a.points == 1]))
+
+    def test_min_update_id(self):
+        answers = self.quiz_db.get_answers(quiz_id='quiz3', min_update_id=3751)
+        self.assertEqual(750, len(answers))
+        self.assertEqual(
+            750, len([a for a in answers if a.quiz_id == 'quiz3']))
+        self.assertEqual(0, len([a for a in answers if a.team_id == 5025]))
+        self.assertEqual(30, len([a for a in answers if a.team_id == 5026]))
+        self.assertEqual(25, len([a for a in answers if a.question == 7]))
+        self.assertEqual(375, len([a for a in answers if a.points == 1]))
 
 
 class UpdateAnswerTest(BaseTestCase):
