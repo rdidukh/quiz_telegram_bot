@@ -14,7 +14,9 @@ STRINGS = textwrap.dedent('''
         "lang": {
             "registration_invitation": "Hello!",
             "registration_confirmation": "Good luck, {team}!",
-            "answer_confirmation": "Confirmed: {answer}."
+            "answer_confirmation": "Confirmed: {answer}.",
+            "send_results_zero_correct_answers": "Zero answers.",
+            "send_results_correct_answers": "Correct answers: {correctly_answered_questions}. Total: {total_score}."
         }
     }
 ''')
@@ -351,6 +353,94 @@ class GetStatusTest(BaseTestCase):
         self.quiz.start_question(question=1)
         status = self.quiz.get_status()
         self.assertEqual(1, status.question)
+
+
+class SendResultsTest(BaseTestCase):
+
+    def test_answers(self):
+        self.quiz_db.get_teams = MagicMock(return_value=[
+            Team(quiz_id='test', id=5001,
+                 name='Liverpool', timestamp=123),
+        ])
+        self.quiz_db.get_answers = MagicMock(return_value=[
+            Answer(quiz_id='test', question=3, team_id=5001,
+                   answer='Apple', timestamp=123, points=1),
+            Answer(quiz_id='test', question=5, team_id=5001,
+                   answer='Banana', timestamp=123, points=1)
+        ])
+        self.quiz.updater.bot.send_message = MagicMock()
+
+        self.quiz.send_results(team_id=5001)
+
+        self.quiz_db.get_teams.assert_called_with(quiz_id='test', team_id=5001)
+        self.quiz_db.get_answers.assert_called_with(
+            quiz_id='test', team_id=5001)
+        self.quiz.updater.bot.send_message.assert_called_with(
+            5001, 'Correct answers: 3, 5. Total: 2.')
+
+    def test_zero_answers(self):
+        self.quiz_db.get_teams = MagicMock(return_value=[
+            Team(quiz_id='test', id=5001,
+                 name='Liverpool', timestamp=123),
+        ])
+        self.quiz_db.get_answers = MagicMock(return_value=[
+            Answer(quiz_id='test', question=3, team_id=5001,
+                   answer='Apple', timestamp=123),
+            Answer(quiz_id='test', question=5, team_id=5001,
+                   answer='Banana', timestamp=123, points=0)
+        ])
+        self.quiz.updater.bot.send_message = MagicMock()
+
+        self.quiz.send_results(team_id=5001)
+
+        self.quiz_db.get_teams.assert_called_with(quiz_id='test', team_id=5001)
+        self.quiz_db.get_answers.assert_called_with(
+            quiz_id='test', team_id=5001)
+        self.quiz.updater.bot.send_message.assert_called_with(
+            5001, 'Zero answers.')
+
+    def test_one_answer(self):
+        self.quiz_db.get_teams = MagicMock(return_value=[
+            Team(quiz_id='test', id=5001,
+                 name='Liverpool', timestamp=123),
+        ])
+        self.quiz_db.get_answers = MagicMock(return_value=[
+            Answer(quiz_id='test', question=3, team_id=5001,
+                   answer='Apple', timestamp=123, points=1),
+        ])
+        self.quiz.updater.bot.send_message = MagicMock()
+
+        self.quiz.send_results(team_id=5001)
+
+        self.quiz.updater.bot.send_message.assert_called_with(
+            5001, 'Correct answers: 3. Total: 1.')
+
+    def test_send_message_raises(self):
+        self.quiz_db.get_teams = MagicMock(return_value=[
+            Team(quiz_id='test', id=5001,
+                 name='Liverpool', timestamp=123),
+        ])
+        self.quiz_db.get_answers = MagicMock(return_value=[
+            Answer(quiz_id='test', question=3, team_id=5001,
+                   answer='Apple', timestamp=123, points=1),
+        ])
+        self.quiz.updater.bot.send_message = MagicMock(
+            side_effect=telegram.error.TelegramError('Error.'))
+
+        self.assertRaisesRegex(TelegramQuizError, 'Could not send',
+                               self.quiz.send_results, team_id=5001)
+
+    def test_team_does_not_exist(self):
+        self.quiz_db.get_teams = MagicMock(return_value=[
+        ])
+        self.quiz_db.get_answers = MagicMock(return_value=[
+            Answer(quiz_id='test', question=3, team_id=5001,
+                   answer='Apple', timestamp=123, points=1),
+        ])
+        self.quiz.updater.bot.send_message = MagicMock()
+
+        self.assertRaisesRegex(TelegramQuizError, 'does not exist',
+                               self.quiz.send_results, team_id=5001)
 
 
 if __name__ == '__main__':

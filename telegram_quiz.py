@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 import logging
 from quiz_db import Answer, Message, QuizDb, Team
+import telegram
 import telegram.ext
 import telegram.update
 import threading
@@ -19,6 +20,8 @@ class Strings:
     registration_invitation: str = ''
     registration_confirmation: str = ''
     answer_confirmation: str = ''
+    send_results_zero_correct_answers: str = ''
+    send_results_correct_answers: str = ''
 
 
 @dataclass
@@ -74,7 +77,7 @@ class TelegramQuiz:
                 f'Language {language} is not supported in file {strings_file}')
 
         strings = Strings()
-        for string in ("registration_invitation", "registration_confirmation", "answer_confirmation"):
+        for string in Strings().__dict__:
             if string not in obj[language]:
                 raise TelegramQuizError(
                     f'String {string} for language {language} not specified in file {strings_file}')
@@ -292,3 +295,29 @@ class TelegramQuiz:
                 registration=bool(self.registration_handler),
                 time=datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
             )
+
+    def send_results(self, *, team_id: int) -> None:
+        teams = self.quiz_db.get_teams(quiz_id=self.id, team_id=team_id)
+
+        if not teams:
+            raise TelegramQuizError(f'Team with id {team_id} does not exist.')
+
+        answers = self.quiz_db.get_answers(
+            quiz_id=self.id, team_id=team_id)
+
+        correct_answers = sorted(
+            [a.question for a in answers if bool(a.points)])
+
+        if not correct_answers:
+            message = self.strings.send_results_zero_correct_answers
+        else:
+            str_answers = ', '.join(
+                [str(a) for a in correct_answers])
+            message = self.strings.send_results_correct_answers.format(
+                correctly_answered_questions=str_answers, total_score=len(correct_answers))
+
+        try:
+            self.updater.bot.send_message(team_id, message)
+        except telegram.error.TelegramError:
+            logging.exception('Send results message error.')
+            raise TelegramQuizError('Could not send a message to the user.')
