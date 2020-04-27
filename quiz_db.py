@@ -126,8 +126,8 @@ class QuizDb:
                                'VALUES (?, ?, ?, ?, ?, ?)',
                                (new_update_id, quiz_id, question, team_id, answer, answer_time))
 
-                self._on_update()
-                return new_update_id
+        self._on_update()
+        return new_update_id
 
     def set_answer_points(self, *, quiz_id: str, question: int, team_id: int, points: int) -> int:
         with self._db_lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
@@ -147,8 +147,8 @@ class QuizDb:
                                'VALUES (?, ?, ?, ?, "", 0, ?)',
                                (new_update_id, quiz_id, question, team_id, points))
 
-                self._on_update()
-                return new_update_id
+        self._on_update()
+        return new_update_id
 
     def update_team(self, quiz_id: str, team_id: int, name: str, registration_time: int) -> int:
         with self._db_lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
@@ -170,8 +170,8 @@ class QuizDb:
                                '(update_id, quiz_id, id, name, timestamp)'
                                'VALUES (?, ?, ?, ?, ?)',
                                (new_update_id, quiz_id, team_id, name, registration_time))
-                self._on_update()
-                return new_update_id
+        self._on_update()
+        return new_update_id
 
     def get_teams(self, *, quiz_id: str, team_id: Optional[int] = None, min_update_id: int = 0) -> List[Team]:
         conditions = []
