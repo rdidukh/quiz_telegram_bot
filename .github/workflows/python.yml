@@ -12,7 +12,7 @@ on:
     - cron: '*/15 * * * *'
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
     strategy:
