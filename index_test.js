@@ -1,7 +1,10 @@
-const index = require('./static/index.js')
 const assert = require('assert');
 const fs = require('fs')
 const jsdom = require("jsdom");
+
+const api = require('./static/api.js')
+const index = require('./static/index.js')
+
 
 class MockFetcher {
     constructor() {
@@ -23,7 +26,7 @@ describe('InitResultsTable', () => {
         const document = dom.window.document
         const numberOfQuestions = 3
 
-        const controller = new index.QuizController(document, new index.Api())
+        const controller = new index.QuizController(document, new api.Api())
         controller.numberOfQuestions = numberOfQuestions
         controller.init()
 
@@ -43,7 +46,7 @@ describe('InitResultsTable', () => {
         const document = dom.window.document
 
         const fetcher = new MockFetcher()
-        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        const controller = new index.QuizController(document, new api.Api(fetcher.get()))
         controller.init()
 
         const button = document.getElementById('start_registration_button')
@@ -61,7 +64,7 @@ describe('InitResultsTable', () => {
         const document = dom.window.document
 
         const fetcher = new MockFetcher()
-        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        const controller = new index.QuizController(document, new api.Api(fetcher.get()))
         controller.init()
 
         const button = document.getElementById('stop_registration_button')
@@ -79,7 +82,7 @@ describe('InitResultsTable', () => {
         const document = dom.window.document
 
         const fetcher = new MockFetcher()
-        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        const controller = new index.QuizController(document, new api.Api(fetcher.get()))
         controller.init()
 
         const button = document.getElementById('start_question_button')
@@ -109,7 +112,7 @@ describe('InitResultsTable', () => {
         const document = dom.window.document
 
         const fetcher = new MockFetcher()
-        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        const controller = new index.QuizController(document, new api.Api(fetcher.get()))
         controller.init()
 
         const button = document.getElementById('stop_question_button')
@@ -126,7 +129,7 @@ describe('InitResultsTable', () => {
         const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
 
-        const controller = new index.QuizController(document, new index.Api())
+        const controller = new index.QuizController(document, new api.Api())
         controller.init()
         controller.currentQuestion = 7
 
@@ -148,7 +151,7 @@ describe('InitResultsTable', () => {
         const dom = new jsdom.JSDOM(indexHtml);
         const document = dom.window.document
 
-        const controller = new index.QuizController(document, new index.Api())
+        const controller = new index.QuizController(document, new api.Api())
         controller.init()
         controller.currentQuestion = 7
 
@@ -439,7 +442,7 @@ describe('ShowAnswersForQuestionTest', () => {
         const document = dom.window.document
 
         const fetcher = new MockFetcher()
-        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        const controller = new index.QuizController(document, new api.Api(fetcher.get()))
 
         controller.teamsIndex = new Map([
             [5001, { name: 'Austria' }],
@@ -477,7 +480,7 @@ describe('ShowAnswersForQuestionTest', () => {
         const document = dom.window.document
 
         const fetcher = new MockFetcher()
-        const controller = new index.QuizController(document, new index.Api(fetcher.get()))
+        const controller = new index.QuizController(document, new api.Api(fetcher.get()))
 
         controller.teamsIndex = new Map([
             [5001, { name: 'Austria' }],
