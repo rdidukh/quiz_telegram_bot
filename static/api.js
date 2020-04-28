@@ -86,4 +86,10 @@ export class Api {
             console.warn('Could not set answer points for question ' + question + ' of team ' + teamId + ': ' + error)
         }
     }
+
+    async sendResults(teamId) {
+        await this.callServer('sendResults', {
+            'team_id': teamId,
+        })
+    }
 }
