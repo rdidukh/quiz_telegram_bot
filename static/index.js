@@ -18,6 +18,7 @@ export class QuizController {
         this.teamsIndex = new Map()
         // question -> teamId -> Answer
         this.answersIndex = new Map()
+        this.runningQuestion = null
         this.currentQuestion = 1
         this.lastSeenStatusUpdateId = 0
         this.lastSeenTeamsUpdateId = 0
@@ -58,6 +59,8 @@ export class QuizController {
             }
             this.showAnswersForQuestion(question)
         }
+
+        this.hightlightResultsTable()
     }
 
     updateStatusTable(status) {
@@ -90,6 +93,26 @@ export class QuizController {
 
         for (let question = 1; question <= this.numberOfQuestions; question++) {
             resultsTableHeaderRow.insertCell(-1).textContent = question
+        }
+    }
+
+    hightlightResultsTable() {
+        const table = this.document.getElementById('results_table')
+
+        for (let r = 0; r < table.rows.length; r++) {
+            for (let c = 2; c < table.rows[r].cells.length; c++) {
+                if (this.currentQuestion + 1 === c) {
+                    table.rows[r].cells[c].classList.add('current_question')
+                } else {
+                    table.rows[r].cells[c].classList.remove('current_question')
+                }
+
+                if (this.runningQuestion + 1 === c) {
+                    table.rows[r].cells[c].classList.add('running_question')
+                } else {
+                    table.rows[r].cells[c].classList.remove('running_question')
+                }
+            }
         }
     }
 
@@ -134,12 +157,26 @@ export class QuizController {
             updateTextContent(row.cells[0], team.name)
             updateTextContent(row.cells[1], totalPoints)
         }
+
+        this.hightlightResultsTable()
+    }
+
+    highlightQuestionHeader() {
+        const header = this.document.getElementById('question_header')
+        if (this.currentQuestion === this.runningQuestion) {
+            header.classList.add('running_question')
+        } else {
+            header.classList.remove('running_question')
+        }
     }
 
     showAnswersForQuestion(question) {
         this.currentQuestion = question
         this.document.getElementById('question_span').textContent = question
+
         this.updateAnswersTable()
+        this.hightlightResultsTable()
+        this.highlightQuestionHeader()
     }
 
     updateStartStopQuestionButtons(status) {
@@ -218,6 +255,7 @@ export class QuizController {
     updateQuiz(updates) {
         if (updates.status) {
             this.lastSeenStatusUpdateId = updates.status.update_id
+            this.runningQuestion = updates.status.question
             console.log('Status update. update_id: ' + updates.status.update_id)
             this.updateStatusTable(updates.status)
             this.updateStartStopQuestionButtons(updates.status)
@@ -243,6 +281,7 @@ export class QuizController {
 
         this.updateResultsTable()
         this.updateAnswersTable()
+        this.highlightQuestionHeader()
     }
 
     async listenToServer() {
