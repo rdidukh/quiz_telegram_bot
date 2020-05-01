@@ -2,21 +2,21 @@
     "en": {
         "registration_invitation": "Registration for the game is open. Send us your team name.",
         "registration_confirmation": "Your team \"{team}\" has been registered. Good luck!",
-        "answer_confirmation": "Your answer has been submitted: \"{answer}\".",
+        "answer_confirmation": "Your answer to question #{question} has been submitted: \"{answer}\".",
         "send_results_zero_correct_answers": "You haven't answered correctly to any question yet. Your score is 0.",
         "send_results_correct_answers": "You answered correctly to questions {correctly_answered_questions}. Your total score is {total_score}."
     },
     "ru": {
         "registration_invitation": "Продолжается регистрация на игру. Пришлите нам название вашей команды.",
         "registration_confirmation": "Ваша команда \"{team}\" зарегистрирована. Удачной игры!",
-        "answer_confirmation": "Ваш ответ принят: \"{answer}\".",
+        "answer_confirmation": "Ваш ответ на вопрос #{question} принят: \"{answer}\".",
         "send_results_zero_correct_answers": "Пока что вы не дали правильных ответов. Ваш результат: 0.",
         "send_results_correct_answers": "Вы ответили правильно на вопросы {correctly_answered_questions}. Ваш результат: {total_score}."
     },
     "uk": {
         "registration_invitation": "Триває реєстрація на гру. Надішліть нам назву вашої команди.",
         "registration_confirmation": "Вашу команду \"{team}\" зареєстровано. Вдалої гри!",
-        "answer_confirmation": "Вашу відповідь прийнято: \"{answer}\".",
+        "answer_confirmation": "Вашу відповідь на питання #{question} прийнято: \"{answer}\".",
         "send_results_zero_correct_answers": "Поки що ви не дали правильних відповідей. Ваш результат: 0.",
         "send_results_correct_answers": "Ви дали правильні відповіді на питання {correctly_answered_questions}. Ваш результат: {total_score}."
     }

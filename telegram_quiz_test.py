@@ -14,7 +14,7 @@ STRINGS = textwrap.dedent('''
         "lang": {
             "registration_invitation": "Hello!",
             "registration_confirmation": "Good luck, {team}!",
-            "answer_confirmation": "Confirmed: {answer}.",
+            "answer_confirmation": "Confirmed #{question}: {answer}.",
             "send_results_zero_correct_answers": "Zero answers.",
             "send_results_correct_answers": "Correct answers: {correctly_answered_questions}. Total: {total_score}."
         }
@@ -251,14 +251,14 @@ class HandleAnswerUpdateTest(BaseTestCase):
         ], self.quiz_db.get_answers(quiz_id='test'))
 
         self.quiz.updater.dispatcher.run_async.assert_called_with(
-            update.message.reply_text, 'Confirmed: Unicode Юнікод 😎.')
+            update.message.reply_text, 'Confirmed #1: Unicode Юнікод 😎.')
 
     @patch('telegram.ext.CallbackContext')
     def test_updates_answer(self, mock_callback_context):
         self.quiz_db.update_team(
             quiz_id='test', team_id=5001, name='Liverpool', registration_time=1)
         self.quiz_db.update_answer(
-            quiz_id='test', question=1, team_id=5001, answer='Apple', answer_time=1)
+            quiz_id='test', question=4, team_id=5001, answer='Apple', answer_time=1)
 
         update = telegram.update.Update(1001, message=telegram.message.Message(
             2001, None,
@@ -267,19 +267,19 @@ class HandleAnswerUpdateTest(BaseTestCase):
         update.message.reply_text = MagicMock()
         self.quiz.updater.dispatcher.run_async = MagicMock()
 
-        self.quiz.start_question(question=1)
+        self.quiz.start_question(question=4)
         self.quiz._handle_answer_update(update, context=None)
         self.quiz.stop_question()
 
         expected_answers = [
-            Answer(quiz_id='test', question=1, team_id=5001,
+            Answer(quiz_id='test', question=4, team_id=5001,
                    answer='Banana', timestamp=4),
         ]
 
         self.assertListEqual(
             expected_answers, self.quiz_db.get_answers(quiz_id='test'))
         self.quiz.updater.dispatcher.run_async.assert_called_with(
-            update.message.reply_text, 'Confirmed: Banana.')
+            update.message.reply_text, 'Confirmed #4: Banana.')
 
     @patch('telegram.ext.CallbackContext')
     def test_non_registered_team(self, mock_callback_context):

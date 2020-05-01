@@ -189,7 +189,8 @@ class TelegramQuiz:
             )
 
             if update_id:
-                reply = self.strings.answer_confirmation.format(answer=answer)
+                reply = self.strings.answer_confirmation.format(
+                    answer=answer, question=self.question)
                 self.updater.dispatcher.run_async(
                     update.message.reply_text, reply)
             else:
