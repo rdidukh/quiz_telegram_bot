@@ -88,8 +88,8 @@ export class QuizController {
     initResultsTable() {
         const table = this.document.getElementById('results_table')
         const resultsTableHeaderRow = table.insertRow()
-        resultsTableHeaderRow.insertCell(-1).textContent = 'Team'
-        resultsTableHeaderRow.insertCell(-1).textContent = 'Total'
+        resultsTableHeaderRow.insertCell().textContent = 'Team'
+        resultsTableHeaderRow.insertCell().textContent = 'Total'
 
         for (let question = 1; question <= this.numberOfQuestions; question++) {
             const cell = resultsTableHeaderRow.insertCell()
@@ -127,13 +127,11 @@ export class QuizController {
             const rowId = 'results_team_' + teamId + '_row'
             var row = this.document.getElementById(rowId)
             if (!row) {
-                row = table.insertRow(-1)
+                row = table.insertRow()
                 row.id = rowId
 
-                row.insertCell(-1)
-                row.insertCell(-1)
-                for (let q = 1; q <= this.numberOfQuestions; q++) {
-                    row.insertCell(-1)
+                for (let q = 1; q <= this.numberOfQuestions + 2; q++) {
+                    row.insertCell()
                 }
             }
 
@@ -211,7 +209,7 @@ export class QuizController {
             const rowId = 'answers_team_' + teamId + '_row'
             var row = this.document.getElementById(rowId)
             if (!row) {
-                row = table.insertRow(-1)
+                row = table.insertRow()
                 row.id = rowId
 
                 const correctButton = this.document.createElement('button')
@@ -228,10 +226,10 @@ export class QuizController {
                     this.api.setAnswerPoints(this.currentQuestion, teamId, 0)
                 }
 
-                row.insertCell(-1).textContent = team.name
-                row.insertCell(-1) // Answer.
-                row.insertCell(-1).appendChild(correctButton)
-                row.insertCell(-1).appendChild(wrongButton)
+                row.insertCell().textContent = team.name
+                row.insertCell() // Answer.
+                row.insertCell().appendChild(correctButton)
+                row.insertCell().appendChild(wrongButton)
             }
 
             if (answers.has(teamId)) {
