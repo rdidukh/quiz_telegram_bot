@@ -30,6 +30,7 @@ table, th, td {
 #results_table tr:first-child td {
     font-weight: bold;
     text-align: center;
+    cursor: pointer;
 }
 
 #results_table td:nth-child(2) {

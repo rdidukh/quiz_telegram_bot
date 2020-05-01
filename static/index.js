@@ -87,12 +87,16 @@ export class QuizController {
 
     initResultsTable() {
         const table = this.document.getElementById('results_table')
-        const resultsTableHeaderRow = table.insertRow(0)
+        const resultsTableHeaderRow = table.insertRow()
         resultsTableHeaderRow.insertCell(-1).textContent = 'Team'
         resultsTableHeaderRow.insertCell(-1).textContent = 'Total'
 
         for (let question = 1; question <= this.numberOfQuestions; question++) {
-            resultsTableHeaderRow.insertCell(-1).textContent = question
+            const cell = resultsTableHeaderRow.insertCell()
+            cell.textContent = question
+            cell.onclick = () => {
+                this.showAnswersForQuestion(question)
+            }
         }
     }
 
