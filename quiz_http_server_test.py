@@ -27,11 +27,6 @@ def _json_to_updates(obj: Dict[str, Any]) -> Updates:
 
 
 class BaseTestCase(tornado.testing.AsyncHTTPTestCase):
-    def _updater_factory(self, bot_api_token: str) -> telegram.ext.Updater:
-        updater = telegram.ext.Updater(bot_api_token, use_context=True)
-        updater.start_polling = MagicMock()
-        return updater
-
     def get_app(self):
         self.test_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.test_dir.name, 'quiz.db')
@@ -42,8 +37,6 @@ class BaseTestCase(tornado.testing.AsyncHTTPTestCase):
         with open(self.strings_file, 'w') as file:
             file.write(STRINGS)
         self.quiz = TelegramQuiz(strings_file=self.strings_file, quiz_db=self.quiz_db)
-        self.quiz.start(quiz_id='test', bot_api_token='123:TOKEN', language='lang', updater_factory=self._updater_factory)
-
         return create_quiz_tornado_app(quiz=self.quiz)
 
     def tearDown(self):
@@ -51,7 +44,20 @@ class BaseTestCase(tornado.testing.AsyncHTTPTestCase):
         super().tearDown()
 
 
-class TestQuizHttpServer(BaseTestCase):
+class StartedQuizBaseTestCase(BaseTestCase):
+    def _updater_factory(self, bot_api_token: str) -> telegram.ext.Updater:
+        updater = telegram.ext.Updater(bot_api_token, use_context=True)
+        updater.start_polling = MagicMock()
+        return updater
+
+    def get_app(self):
+        app = super().get_app()
+        self.quiz.start(quiz_id='test', bot_api_token='123:TOKEN', language='lang',
+                        updater_factory=self._updater_factory)
+        return app
+
+
+class TestQuizHttpServer(StartedQuizBaseTestCase):
     def test_root(self):
         response = self.fetch('/')
         self.assertEqual(200, response.code)
@@ -122,7 +128,62 @@ class TestQuizHttpServer(BaseTestCase):
         self.assertIsNone(self.quiz._question)
 
 
-class SetAnswerPointsApiTest(BaseTestCase):
+class StartQuizApiTest(BaseTestCase):
+    def test_starts_quiz(self):
+        self.quiz.start = MagicMock()
+        request = {
+            'quiz_id': 'test',
+            'bot_api_token': '123:TOKEN',
+            'language': 'lang',
+        }
+        response = self.fetch('/api/startQuiz', method='POST',
+                              body=json.dumps(request))
+        self.assertDictEqual({}, json.loads(response.body))
+        self.assertEqual(200, response.code)
+        self.quiz.start.assert_called_with(
+            quiz_id='test', bot_api_token='123:TOKEN', language='lang')
+
+    def test_quiz_id_param(self):
+        request = {
+            'bot_api_token': '123:TOKEN',
+            'language': 'lang',
+        }
+        response = self.fetch('/api/startQuiz', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+    def test_no_bot_api_token_param(self):
+        request = {
+            'quiz_id': 'test',
+            'language': 'lang',
+        }
+        response = self.fetch('/api/startQuiz', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+    def test_no_language_param(self):
+        request = {
+            'quiz_id': 'test',
+            'bot_api_token': '123:TOKEN',
+        }
+        response = self.fetch('/api/startQuiz', method='POST',
+                              body=json.dumps(request))
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+
+    def test_stops_quiz(self):
+        self.quiz.stop = MagicMock()
+        request = {}
+        response = self.fetch('/api/stopQuiz', method='POST',
+                              body=json.dumps(request))
+        self.assertDictEqual({}, json.loads(response.body))
+        self.assertEqual(200, response.code)
+        self.quiz.stop.assert_called_with()
+
+
+class SetAnswerPointsApiTest(StartedQuizBaseTestCase):
     def test_updates_points(self):
         self.quiz_db.set_answer_points = MagicMock(return_value=4)
         request = {
@@ -215,7 +276,7 @@ class SetAnswerPointsApiTest(BaseTestCase):
         self.assertEqual(400, response.code)
 
 
-class GetUpdatesApiTest(BaseTestCase):
+class GetUpdatesApiTest(StartedQuizBaseTestCase):
     def test_returns_updates(self):
         update_id = self.quiz.status_update_id
         self.quiz.get_status = MagicMock(return_value=QuizStatus(
@@ -519,7 +580,7 @@ class GetUpdatesApiTest(BaseTestCase):
         self.assertIn('error', json.loads(response.body))
 
 
-class SendResultsApiTest(BaseTestCase):
+class SendResultsApiTest(StartedQuizBaseTestCase):
     def test_sends_results(self):
         self.quiz.send_results = MagicMock()
         request = {'team_id': 5001}

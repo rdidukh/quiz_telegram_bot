@@ -204,6 +204,21 @@ class StopQuestionApiHandler(BaseQuizRequestHandler):
         return {}
 
 
+class StartQuizApiHandler(BaseQuizRequestHandler):
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        quiz_id = self.get_param_value(request, 'quiz_id', str)
+        bot_api_token = self.get_param_value(request, 'bot_api_token', str)
+        language = self.get_param_value(request, 'language', str)
+        self.quiz.start(quiz_id=quiz_id, bot_api_token=bot_api_token, language=language)
+        return {}
+
+
+class StopQuizApiHandler(BaseQuizRequestHandler):
+    async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        self.quiz.stop()
+        return {}
+
+
 def create_quiz_tornado_app(*, quiz: TelegramQuiz) -> tornado.web.Application:
     args = dict(quiz=quiz)
     return tornado.web.Application([
@@ -214,6 +229,8 @@ def create_quiz_tornado_app(*, quiz: TelegramQuiz) -> tornado.web.Application:
         ('/api/startRegistration', StartRegistrationApiHandler, args),
         ('/api/stopRegistration', StopRegistrationApiHandler, args),
         ('/api/startQuestion', StartQuestionApiHandler, args),
+        ('/api/startQuiz', StartQuizApiHandler, args),
         ('/api/stopQuestion', StopQuestionApiHandler, args),
+        ('/api/stopQuiz', StopQuizApiHandler, args),
         ('/(.*)', tornado.web.StaticFileHandler, {'path': 'static'}),
     ])
