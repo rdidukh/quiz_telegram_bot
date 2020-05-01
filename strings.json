@@ -6,6 +6,13 @@
         "send_results_zero_correct_answers": "You haven't answered correctly to any question yet. Your score is 0.",
         "send_results_correct_answers": "You answered correctly to questions {correctly_answered_questions}. Your total score is {total_score}."
     },
+    "ru": {
+        "registration_invitation": "Продолжается регистрация на игру. Пришлите нам название вашей команды.",
+        "registration_confirmation": "Ваша команда \"{team}\" зарегистрирована. Удачной игры!",
+        "answer_confirmation": "Ваш ответ принят: \"{answer}\".",
+        "send_results_zero_correct_answers": "Пока что вы не дали правильных ответов. Ваш результат: 0.",
+        "send_results_correct_answers": "Вы ответили правильно на вопросы {correctly_answered_questions}. Ваш результат: {total_score}."
+    },
     "uk": {
         "registration_invitation": "Триває реєстрація на гру. Надішліть нам назву вашої команди.",
         "registration_confirmation": "Вашу команду \"{team}\" зареєстровано. Вдалої гри!",
