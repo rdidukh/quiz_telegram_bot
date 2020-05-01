@@ -114,6 +114,15 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
         timeout = self.get_param_value(request, 'timeout', (float, int), 0.0)
         timeout = min(timeout, 30.0)
 
+        if min_status_update_id == -1:
+            min_status_update_id = 2**31 - 1
+
+        if min_teams_update_id == -1:
+            min_teams_update_id = 2**31 - 1
+
+        if min_answers_update_id == -1:
+            min_answers_update_id = 2**31 - 1
+
         updates = self._get_updates(
             min_status_update_id, min_teams_update_id, min_answers_update_id)
         if not self._updates_empty(updates) or timeout <= 0:

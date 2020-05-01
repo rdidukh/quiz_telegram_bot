@@ -1,6 +1,7 @@
 *.db
 *.log
 __pycache__/*
+.idea/*
 .pytype/*
 .vscode/.ropeproject/*
 node_modules/*
