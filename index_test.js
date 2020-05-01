@@ -2,35 +2,25 @@ const assert = require('assert');
 const fs = require('fs')
 const jsdom = require("jsdom");
 
-const api = require('./static/api.js')
+const { MockApi } = require('./mock_api.js')
 const index = require('./static/index.js')
 
 
-class MockFetcher {
-    constructor() {
-        this.calls = []
-    }
-
-    get() {
-        return async (url, options) => {
-            this.calls.push({ url: url, options: options })
-            return { text: () => '{}', status: 200 }
-        }
-    }
-}
-
 describe('Index', () => {
     let document
+    let api
+    let controller
 
     beforeEach(() => {
         const indexHtml = fs.readFileSync('static/index.html')
         const dom = new jsdom.JSDOM(indexHtml);
         document = dom.window.document
+        api = new MockApi()
+        controller = new index.QuizController(document, api)
     })
 
     describe('InitResultsTable', () => {
         it('#questionNumbers', () => {
-            const controller = new index.QuizController(document, new api.Api())
             controller.numberOfQuestions = 3
             controller.init()
 
@@ -44,76 +34,79 @@ describe('Index', () => {
             assert.equal(table.rows[0].cells[4].textContent, '3')
         });
 
+        it('#questionNumbersDoubleClickable', async () => {
+            controller.numberOfQuestions = 3
+            controller.init()
+
+            const table = document.getElementById('results_table')
+
+            controller.runningQuestion = null
+            await table.rows[0].cells[2].ondblclick()
+            assert.deepEqual(api.startQuestionCalls, [[1]])
+            assert.deepEqual(api.stopQuestionCalls, [])
+
+            api.startQuestionCalls = []
+            api.stopQuestionCalls = []
+            controller.runningQuestion = 2
+            await table.rows[0].cells[3].ondblclick()
+            assert.deepEqual(api.startQuestionCalls, [])
+            assert.deepEqual(api.stopQuestionCalls, [[]])
+
+            api.startQuestionCalls = []
+            api.stopQuestionCalls = []
+            controller.runningQuestion = 2
+            await table.rows[0].cells[4].ondblclick()
+            assert.deepEqual(api.startQuestionCalls, [])
+            assert.deepEqual(api.stopQuestionCalls, [])
+        });
+
         it('#startRegistrationButton', async () => {
-            const fetcher = new MockFetcher()
-            const controller = new index.QuizController(document, new api.Api(fetcher.get()))
             controller.init()
 
             const button = document.getElementById('start_registration_button')
-
             await button.onclick()
 
-            args = fetcher.calls.slice(-1).pop()
-            assert.equal(args.url, '/api/startRegistration')
-            assert.deepEqual(JSON.parse(args.options.body), {})
+            assert.deepEqual(api.startRegistrationCalls, [[]])
         });
 
         it('#stopRegistrationButton', async () => {
-            const fetcher = new MockFetcher()
-            const controller = new index.QuizController(document, new api.Api(fetcher.get()))
             controller.init()
 
             const button = document.getElementById('stop_registration_button')
 
             await button.onclick()
 
-            args = fetcher.calls.slice(-1).pop()
-            assert.equal(args.url, '/api/stopRegistration')
-            assert.deepEqual(JSON.parse(args.options.body), {})
+            assert.deepEqual(api.stopRegistrationCalls, [[]])
         });
 
         it('#startQuestionButton', async () => {
-            const fetcher = new MockFetcher()
-            const controller = new index.QuizController(document, new api.Api(fetcher.get()))
             controller.init()
 
             const button = document.getElementById('start_question_button')
 
             await button.onclick()
 
-            args = fetcher.calls.slice(-1).pop()
-            assert.equal(args.url, '/api/startQuestion')
-            assert.deepEqual(JSON.parse(args.options.body), {
-                question: 1
-            })
+            assert.deepEqual(api.startQuestionCalls, [[1]])
 
             controller.currentQuestion = 17
+            api.startQuestionCalls = []
 
             await button.onclick()
 
-            args = fetcher.calls.slice(-1).pop()
-            assert.equal(args.url, '/api/startQuestion')
-            assert.deepEqual(JSON.parse(args.options.body), {
-                question: 17
-            })
+            assert.deepEqual(api.startQuestionCalls, [[17]])
         });
 
         it('#stopQuestionButton', async () => {
-            const fetcher = new MockFetcher()
-            const controller = new index.QuizController(document, new api.Api(fetcher.get()))
             controller.init()
 
             const button = document.getElementById('stop_question_button')
 
             await button.onclick()
 
-            args = fetcher.calls.slice(-1).pop()
-            assert.equal(args.url, '/api/stopQuestion')
-            assert.deepEqual(JSON.parse(args.options.body), {})
+            assert.deepEqual(api.stopQuestionCalls, [[]])
         });
 
         it('#previousQuestionButton', async () => {
-            const controller = new index.QuizController(document, new api.Api())
             controller.init()
             controller.currentQuestion = 7
 
@@ -131,7 +124,6 @@ describe('Index', () => {
         });
 
         it('#nextQuestionButton', async () => {
-            const controller = new index.QuizController(document, new api.Api())
             controller.init()
             controller.currentQuestion = 7
 
@@ -291,8 +283,6 @@ describe('Index', () => {
             table.rows[2].cells[0].textContent = 'REMOVE'
             table.rows[2].cells[1].textContent = 'REMOVE'
 
-            const controller = new index.QuizController(document)
-
             controller.teamsIndex = new Map([
                 [5001, { name: 'Austria' }],
                 [5002, { name: 'Belgium' }],
@@ -312,8 +302,6 @@ describe('Index', () => {
         });
 
         it('#addsNewRows', () => {
-            const controller = new index.QuizController(document)
-
             controller.teamsIndex = new Map([
                 [5001, { name: 'Austria' }],
                 [5002, { name: 'Belgium' }],
@@ -341,8 +329,6 @@ describe('Index', () => {
         });
 
         it('#answerCellClass', () => {
-            const controller = new index.QuizController(document)
-
             controller.teamsIndex = new Map([
                 [5001, { name: 'Austria' }],
                 [5002, { name: 'Belgium' }],
@@ -395,9 +381,6 @@ describe('Index', () => {
         });
 
         it('#correctAnswerButtons', async () => {
-            const fetcher = new MockFetcher()
-            const controller = new index.QuizController(document, new api.Api(fetcher.get()))
-
             controller.teamsIndex = new Map([
                 [5001, { name: 'Austria' }],
                 [5002, { name: 'Belgium' }],
@@ -415,23 +398,15 @@ describe('Index', () => {
                     var button = document.querySelector('#answers_team_' + teamId + '_row').cells[2].firstChild
                     assert.equal(button.tagName, 'BUTTON')
                     assert.equal(button.classList.contains('green_text'), true)
+
                     await button.onclick()
 
-                    var args = fetcher.calls.slice(-1).pop()
-                    assert.equal(args.url, '/api/setAnswerPoints')
-                    assert.deepEqual(JSON.parse(args.options.body), {
-                        question: question,
-                        points: 1,
-                        team_id: teamId,
-                    })
+                    assert.deepEqual(api.setAnswerPointsCalls.slice(-1).pop(), [question, teamId, 1])
                 }
             }
         })
 
         it('#wrongAnswerButtons', async () => {
-            const fetcher = new MockFetcher()
-            const controller = new index.QuizController(document, new api.Api(fetcher.get()))
-
             controller.teamsIndex = new Map([
                 [5001, { name: 'Austria' }],
                 [5002, { name: 'Belgium' }],
@@ -451,13 +426,7 @@ describe('Index', () => {
                     assert.equal(button.classList.contains('red_text'), true)
                     await button.onclick()
 
-                    var args = fetcher.calls.slice(-1).pop()
-                    assert.equal(args.url, '/api/setAnswerPoints')
-                    assert.deepEqual(JSON.parse(args.options.body), {
-                        question: question,
-                        points: 0,
-                        team_id: teamId,
-                    })
+                    assert.deepEqual(api.setAnswerPointsCalls.slice(-1).pop(), [question, teamId, 0])
                 }
             }
         })
@@ -465,8 +434,6 @@ describe('Index', () => {
 
     describe('UpdateQuizTest', () => {
         it('#updatesQuiz', () => {
-            const controller = new index.QuizController(document)
-
             controller.updateQuiz({
                 status: {
                     update_id: 123,
@@ -518,8 +485,6 @@ describe('Index', () => {
 
             startButton.classList.add('disabled')
 
-            const controller = new index.QuizController(document)
-
             controller.updateQuiz({
                 status: {
                     update_id: 123,
@@ -548,8 +513,6 @@ describe('Index', () => {
 
             stopButton.classList.add('disabled')
 
-            const controller = new index.QuizController(document)
-
             controller.updateQuiz({
                 status: {
                     update_id: 123,
@@ -576,8 +539,6 @@ describe('Index', () => {
             var statusTable = document.getElementById('status_table')
             var startButton = statusTable.rows[3].cells[1].firstElementChild
             var stopButton = statusTable.rows[3].cells[2].firstElementChild
-
-            const controller = new index.QuizController(document)
 
             controller.updateQuiz({
                 status: {
@@ -608,8 +569,6 @@ describe('Index', () => {
 
                 startButton.classList.add('disabled')
 
-                const controller = new index.QuizController(document)
-
                 controller.updateQuiz({
                     status: {
                         update_id: 123,
@@ -630,8 +589,6 @@ describe('Index', () => {
             it('#questionNullRegistrationTrue', () => {
                 const startButton = document.getElementById('start_question_button')
                 const stopButton = document.getElementById('stop_question_button')
-
-                const controller = new index.QuizController(document)
 
                 controller.updateQuiz({
                     status: {
@@ -655,8 +612,6 @@ describe('Index', () => {
                 const stopButton = document.getElementById('stop_question_button')
 
                 stopButton.classList.add('disabled')
-
-                const controller = new index.QuizController(document)
 
                 controller.updateQuiz({
                     status: {
@@ -690,7 +645,6 @@ describe('Index', () => {
         })
 
         it('#highlightsCurrentQuestion', () => {
-            const controller = new index.QuizController(document)
             controller.currentQuestion = 2
             const table = document.getElementById('results_table')
             table.rows[1].cells[2].classList.add('current_question')
@@ -706,7 +660,6 @@ describe('Index', () => {
         })
 
         it('#highlightsRunningQuestion', () => {
-            const controller = new index.QuizController(document)
             controller.runningQuestion = 2
             const table = document.getElementById('results_table')
             table.rows[1].cells[2].classList.add('running_question')
@@ -725,7 +678,6 @@ describe('Index', () => {
     describe('HighlightQuestionHeader', () => {
 
         it('#highlights', () => {
-            const controller = new index.QuizController(document)
             controller.currentQuestion = 2
             controller.runningQuestion = 2
 
@@ -736,7 +688,6 @@ describe('Index', () => {
         })
 
         it('#skips', () => {
-            const controller = new index.QuizController(document)
             controller.currentQuestion = 2
             controller.runningQuestion = 1
 

@@ -2,26 +2,8 @@ const assert = require('assert');
 const fs = require('fs')
 const jsdom = require("jsdom");
 
+const { MockApi } = require('./mock_api.js')
 const { Controller } = require('./static/send_results.js')
-
-class MockApi {
-    constructor({ getUpdates, sendResults }) {
-        this.getUpdatesCalls = []
-        this.mockGetUpdates = getUpdates
-        this.sendResultsCalls = []
-        this.mockSendResults = sendResults
-    }
-
-    async getUpdates(a, b, c) {
-        this.getUpdatesCalls.push([a, b, c])
-        return this.mockGetUpdates(a, b, c)
-    }
-
-    async sendResults(t) {
-        this.sendResultsCalls.push([t])
-        return this.mockSendResults(t)
-    }
-}
 
 describe('Init', () => {
     let document = null
@@ -32,18 +14,17 @@ describe('Init', () => {
         const indexHtml = fs.readFileSync('static/send_results.html')
         const dom = new jsdom.JSDOM(indexHtml);
         document = dom.window.document
-        api = new MockApi({
-            getUpdates: async () => {
-                return {
-                    teams: [
-                        { id: 5001, name: 'Austria' },
-                        { id: 5002, name: 'Belgium' },
-                        { id: 5003, name: 'Croatia' }
-                    ]
-                }
-            },
-            sendResults: async () => { }
-        })
+        api = new MockApi()
+        api.mockGetUpdates = async () => {
+            return {
+                teams: [
+                    { id: 5001, name: 'Austria' },
+                    { id: 5002, name: 'Belgium' },
+                    { id: 5003, name: 'Croatia' }
+                ]
+            }
+        }
+        api.mockSendResults = async () => { }
 
         controller = new Controller(document, api)
     })

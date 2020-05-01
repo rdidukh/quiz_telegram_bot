@@ -97,6 +97,13 @@ export class QuizController {
             cell.onclick = () => {
                 this.showAnswersForQuestion(question)
             }
+            cell.ondblclick = async () => {
+                if (this.runningQuestion == null) {
+                    await this.api.startQuestion(question)
+                } else if (this.runningQuestion === question) {
+                    await this.api.stopQuestion()
+                }
+            }
         }
     }
 
