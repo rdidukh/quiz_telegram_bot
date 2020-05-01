@@ -30,20 +30,101 @@ class BaseTestCase(unittest.TestCase):
         with open(self.strings_file, 'w') as file:
             file.write(STRINGS)
         self.quiz_db = QuizDb(db_path=self.db_path)
-        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', language='lang',
-                                 strings_file=self.strings_file, quiz_db=self.quiz_db)
+        self.quiz = TelegramQuiz(strings_file=self.strings_file, quiz_db=self.quiz_db)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
 
-class StartRegistrationTest(BaseTestCase):
+def _updater_factory(bot_api_token: str) -> telegram.ext.Updater:
+    updater = telegram.ext.Updater(bot_api_token, use_context=True)
+    updater.start_polling = MagicMock()
+    updater.stop = MagicMock()
+    return updater
+
+
+class StartedQuizBaseTestCase(BaseTestCase):
+    def setUp(self):
+        super().setUp()
+        self.quiz.start(quiz_id='test', bot_api_token='123:TOKEN', language='lang', updater_factory=_updater_factory)
+
+
+class StartTest(BaseTestCase):
+    def test_starts(self):
+        sub = MagicMock()
+        self.quiz.add_updates_subscriber(sub)
+        update_id = self.quiz.status_update_id
+
+        self.quiz.start(quiz_id='test', bot_api_token='123:TOKEN', language='lang',
+                        updater_factory=_updater_factory)
+
+        self.assertIn(self.quiz._handle_error, self.quiz._updater.dispatcher.error_handlers)
+        self.assertEqual(self.quiz._handle_log_update, self.quiz._updater.dispatcher.handlers[0][0].callback)
+        self.quiz._updater.start_polling.assert_called_with()
+        self.assertEqual('test', self.quiz._id)
+        self.assertEqual('lang', self.quiz._language)
+        self.assertEqual('Hello!', self.quiz._strings.registration_invitation)
+        self.assertEqual(update_id+1, self.quiz.status_update_id)
+        sub.assert_called_with()
+
+    def test_raises_when_already_started(self):
+        self.quiz.start(quiz_id='test', bot_api_token='123:TOKEN', language='lang',
+                        updater_factory=_updater_factory)
+        sub = MagicMock()
+        self.quiz.add_updates_subscriber(sub)
+        update_id = self.quiz.status_update_id
+
+        self.assertRaises(TelegramQuizError, self.quiz.start, quiz_id='test', bot_api_token='123:TOKEN', language='lang')
+
+        self.assertEqual(update_id, self.quiz.status_update_id)
+        sub.assert_not_called()
+
+    def test_drops_old_handlers_on_restart(self):
+        self.quiz.start(quiz_id='test', bot_api_token='123:TOKEN', language='lang',
+                        updater_factory=_updater_factory)
+        self.quiz.start_question(1)
+        self.quiz.stop()
+        self.quiz.start(quiz_id='test', bot_api_token='123:TOKEN', language='lang',
+                        updater_factory=_updater_factory)
+
+        self.assertNotIn(1, self.quiz._updater.dispatcher.handlers)
+
+
+class StopTest(StartedQuizBaseTestCase):
+    def test_stops(self):
+        sub = MagicMock()
+        self.quiz.add_updates_subscriber(sub)
+        update_id = self.quiz.status_update_id
+        old_updater = self.quiz._updater
+
+        self.quiz.stop()
+
+        old_updater.stop.assert_called_with()
+        self.assertIsNone(self.quiz._id)
+        self.assertIsNone(self.quiz._language)
+        self.assertIsNone(self.quiz._strings)
+        self.assertIsNone(self.quiz._updater)
+        self.assertEqual(update_id+1, self.quiz.status_update_id)
+        sub.assert_called_with()
+
+    def raises_when_already_stopped(self):
+        sub = MagicMock()
+        self.quiz.add_updates_subscriber(sub)
+        update_id = self.quiz.status_update_id
+
+        self.quiz.stop()
+
+        self.assertRaises(TelegramQuizError, self.quiz.stop)
+        self.assertEqual(update_id, self.quiz.status_update_id)
+        sub.assert_not_called()
+
+
+class StartRegistrationTest(StartedQuizBaseTestCase):
     def test_starts_registration(self):
         update_id = self.quiz.status_update_id
-        self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
         self.quiz.start_registration()
         self.assertEqual(self.quiz._handle_registration_update,
-                         self.quiz.updater.dispatcher.handlers[1][0].callback)
+                         self.quiz._updater.dispatcher.handlers[1][0].callback)
         self.assertGreater(self.quiz.status_update_id, update_id)
 
     def test_raises_when_starting_twice(self):
@@ -51,7 +132,7 @@ class StartRegistrationTest(BaseTestCase):
         update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError, self.quiz.start_registration)
         self.assertEqual(self.quiz._handle_registration_update,
-                         self.quiz.updater.dispatcher.handlers[1][0].callback)
+                         self.quiz._updater.dispatcher.handlers[1][0].callback)
         self.assertEqual(update_id, self.quiz.status_update_id)
 
     def test_raises_when_question_is_on(self):
@@ -61,12 +142,12 @@ class StartRegistrationTest(BaseTestCase):
         self.assertEqual(update_id, self.quiz.status_update_id)
 
 
-class StopRegistrationTest(BaseTestCase):
+class StopRegistrationTest(StartedQuizBaseTestCase):
     def test_stops_registration(self):
         self.quiz.start_registration()
         update_id = self.quiz.status_update_id
         self.quiz.stop_registration()
-        self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
+        self.assertNotIn(1, self.quiz._updater.dispatcher.handlers)
         self.assertGreater(self.quiz.status_update_id, update_id)
 
     def test_raises_when_stopping_twice(self):
@@ -77,14 +158,13 @@ class StopRegistrationTest(BaseTestCase):
         self.assertEqual(update_id, self.quiz.status_update_id)
 
 
-class StartQuestionTest(BaseTestCase):
+class StartQuestionTest(StartedQuizBaseTestCase):
     def test_starts_question(self):
         update_id = self.quiz.status_update_id
-        self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
         self.quiz.start_question(question=1)
         self.assertEqual(self.quiz._handle_answer_update,
-                         self.quiz.updater.dispatcher.handlers[1][0].callback)
-        self.assertEqual(1, self.quiz.question)
+                         self.quiz._updater.dispatcher.handlers[1][0].callback)
+        self.assertEqual(1, self.quiz._question)
         self.assertGreater(self.quiz.status_update_id, update_id)
 
     def test_start_question_twice_raises(self):
@@ -102,13 +182,13 @@ class StartQuestionTest(BaseTestCase):
         self.assertEqual(update_id, self.quiz.status_update_id)
 
 
-class StopQuestionTest(BaseTestCase):
+class StopQuestionTest(StartedQuizBaseTestCase):
     def test_stops_question(self):
         self.quiz.start_question(question=1)
         update_id = self.quiz.status_update_id
         self.quiz.stop_question()
-        self.assertDictEqual({}, self.quiz.updater.dispatcher.handlers)
-        self.assertIsNone(self.quiz.question)
+        self.assertNotIn(1, self.quiz._updater.dispatcher.handlers)
+        self.assertIsNone(self.quiz._question)
         self.assertGreater(self.quiz.status_update_id, update_id)
 
     def test_stop_question_twice_raises(self):
@@ -139,7 +219,7 @@ class HandleLogUpdateTest(BaseTestCase):
         ], self.quiz_db.select_messages())
 
 
-class HandleRegistrationUpdateTest(BaseTestCase):
+class HandleRegistrationUpdateTest(StartedQuizBaseTestCase):
 
     @patch('telegram.ext.CallbackContext')
     def test_sends_invitation(self, mock_callback_context):
@@ -228,7 +308,7 @@ class HandleRegistrationUpdateTest(BaseTestCase):
         self.assertListEqual([], self.quiz_db.get_teams(quiz_id='test'))
 
 
-class HandleAnswerUpdateTest(BaseTestCase):
+class HandleAnswerUpdateTest(StartedQuizBaseTestCase):
     @patch('telegram.ext.CallbackContext')
     def test_inserts_answer(self, mock_callback_context):
         self.quiz_db.update_team(
@@ -239,7 +319,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
             datetime.fromtimestamp(4),
             chat=telegram.Chat(5001, 'private'), text=' \nUnicode\n Юнікод  😎   \n\n  '))
         update.message.reply_text = MagicMock()
-        self.quiz.updater.dispatcher.run_async = MagicMock()
+        self.quiz._updater.dispatcher.run_async = MagicMock()
 
         self.quiz.start_question(question=1)
         self.quiz._handle_answer_update(update, context=None)
@@ -250,7 +330,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
                    answer='Unicode Юнікод 😎', timestamp=4),
         ], self.quiz_db.get_answers(quiz_id='test'))
 
-        self.quiz.updater.dispatcher.run_async.assert_called_with(
+        self.quiz._updater.dispatcher.run_async.assert_called_with(
             update.message.reply_text, 'Confirmed #1: Unicode Юнікод 😎.')
 
     @patch('telegram.ext.CallbackContext')
@@ -265,7 +345,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
             datetime.fromtimestamp(4),
             chat=telegram.Chat(5001, 'private'), text='Banana'))
         update.message.reply_text = MagicMock()
-        self.quiz.updater.dispatcher.run_async = MagicMock()
+        self.quiz._updater.dispatcher.run_async = MagicMock()
 
         self.quiz.start_question(question=4)
         self.quiz._handle_answer_update(update, context=None)
@@ -278,7 +358,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
 
         self.assertListEqual(
             expected_answers, self.quiz_db.get_answers(quiz_id='test'))
-        self.quiz.updater.dispatcher.run_async.assert_called_with(
+        self.quiz._updater.dispatcher.run_async.assert_called_with(
             update.message.reply_text, 'Confirmed #4: Banana.')
 
     @patch('telegram.ext.CallbackContext')
@@ -327,7 +407,7 @@ class HandleAnswerUpdateTest(BaseTestCase):
         self.assertListEqual([], self.quiz_db.get_answers(quiz_id='test'))
 
 
-class GetStatusTest(BaseTestCase):
+class GetStatusTest(StartedQuizBaseTestCase):
     def test_returns_status(self):
         status = self.quiz.get_status()
 
@@ -355,7 +435,7 @@ class GetStatusTest(BaseTestCase):
         self.assertEqual(1, status.question)
 
 
-class SendResultsTest(BaseTestCase):
+class SendResultsTest(StartedQuizBaseTestCase):
 
     def test_answers(self):
         self.quiz_db.get_teams = MagicMock(return_value=[
@@ -368,14 +448,14 @@ class SendResultsTest(BaseTestCase):
             Answer(quiz_id='test', question=5, team_id=5001,
                    answer='Banana', timestamp=123, points=1)
         ])
-        self.quiz.updater.bot.send_message = MagicMock()
+        self.quiz._updater.bot.send_message = MagicMock()
 
         self.quiz.send_results(team_id=5001)
 
         self.quiz_db.get_teams.assert_called_with(quiz_id='test', team_id=5001)
         self.quiz_db.get_answers.assert_called_with(
             quiz_id='test', team_id=5001)
-        self.quiz.updater.bot.send_message.assert_called_with(
+        self.quiz._updater.bot.send_message.assert_called_with(
             5001, 'Correct answers: 3, 5. Total: 2.')
 
     def test_zero_answers(self):
@@ -389,14 +469,14 @@ class SendResultsTest(BaseTestCase):
             Answer(quiz_id='test', question=5, team_id=5001,
                    answer='Banana', timestamp=123, points=0)
         ])
-        self.quiz.updater.bot.send_message = MagicMock()
+        self.quiz._updater.bot.send_message = MagicMock()
 
         self.quiz.send_results(team_id=5001)
 
         self.quiz_db.get_teams.assert_called_with(quiz_id='test', team_id=5001)
         self.quiz_db.get_answers.assert_called_with(
             quiz_id='test', team_id=5001)
-        self.quiz.updater.bot.send_message.assert_called_with(
+        self.quiz._updater.bot.send_message.assert_called_with(
             5001, 'Zero answers.')
 
     def test_one_answer(self):
@@ -408,11 +488,11 @@ class SendResultsTest(BaseTestCase):
             Answer(quiz_id='test', question=3, team_id=5001,
                    answer='Apple', timestamp=123, points=1),
         ])
-        self.quiz.updater.bot.send_message = MagicMock()
+        self.quiz._updater.bot.send_message = MagicMock()
 
         self.quiz.send_results(team_id=5001)
 
-        self.quiz.updater.bot.send_message.assert_called_with(
+        self.quiz._updater.bot.send_message.assert_called_with(
             5001, 'Correct answers: 3. Total: 1.')
 
     def test_send_message_raises(self):
@@ -424,7 +504,7 @@ class SendResultsTest(BaseTestCase):
             Answer(quiz_id='test', question=3, team_id=5001,
                    answer='Apple', timestamp=123, points=1),
         ])
-        self.quiz.updater.bot.send_message = MagicMock(
+        self.quiz._updater.bot.send_message = MagicMock(
             side_effect=telegram.error.TelegramError('Error.'))
 
         self.assertRaisesRegex(TelegramQuizError, 'Could not send',
@@ -437,7 +517,7 @@ class SendResultsTest(BaseTestCase):
             Answer(quiz_id='test', question=3, team_id=5001,
                    answer='Apple', timestamp=123, points=1),
         ])
-        self.quiz.updater.bot.send_message = MagicMock()
+        self.quiz._updater.bot.send_message = MagicMock()
 
         self.assertRaisesRegex(TelegramQuizError, 'does not exist',
                                self.quiz.send_results, team_id=5001)

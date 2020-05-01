@@ -32,10 +32,8 @@ def main(args: List[str]):
 
     quiz_db = QuizDb(db_path=args.quiz_db)
 
-    quiz = TelegramQuiz(id=args.quiz_id, bot_token=args.telegram_bot_token,
-                        quiz_db=quiz_db, strings_file=args.strings_file,
-                        language=args.language)
-    quiz.start()
+    quiz = TelegramQuiz(quiz_db=quiz_db, strings_file=args.strings_file)
+    quiz.start(quiz_id=args.quiz_id, bot_api_token=args.telegram_bot_token, language=args.language)
 
     app = quiz_http_server.create_quiz_tornado_app(quiz=quiz)
     app.listen(8000)

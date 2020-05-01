@@ -27,6 +27,11 @@ def _json_to_updates(obj: Dict[str, Any]) -> Updates:
 
 
 class BaseTestCase(tornado.testing.AsyncHTTPTestCase):
+    def _updater_factory(self, bot_api_token: str) -> telegram.ext.Updater:
+        updater = telegram.ext.Updater(bot_api_token, use_context=True)
+        updater.start_polling = MagicMock()
+        return updater
+
     def get_app(self):
         self.test_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.test_dir.name, 'quiz.db')
@@ -36,8 +41,9 @@ class BaseTestCase(tornado.testing.AsyncHTTPTestCase):
         self.strings_file = os.path.join(self.test_dir.name, 'strings.json')
         with open(self.strings_file, 'w') as file:
             file.write(STRINGS)
-        self.quiz = TelegramQuiz(id='test', bot_token='123:TOKEN', language='lang',
-                                 strings_file=self.strings_file, quiz_db=self.quiz_db)
+        self.quiz = TelegramQuiz(strings_file=self.strings_file, quiz_db=self.quiz_db)
+        self.quiz.start(quiz_id='test', bot_api_token='123:TOKEN', language='lang', updater_factory=self._updater_factory)
+
         return create_quiz_tornado_app(quiz=self.quiz)
 
     def tearDown(self):
@@ -97,7 +103,7 @@ class TestQuizHttpServer(BaseTestCase):
                               method='POST', body=json.dumps(request))
         self.assertEqual(200, response.code)
         self.assertDictEqual({}, json.loads(response.body))
-        self.assertEqual(1, self.quiz.question)
+        self.assertEqual(1, self.quiz._question)
 
     def test_start_wrong_question(self):
         request = {'question': 'unexisting'}
@@ -106,14 +112,14 @@ class TestQuizHttpServer(BaseTestCase):
         self.assertEqual(400, response.code)
         self.assertListEqual(['error'],
                              list(json.loads(response.body).keys()))
-        self.assertIsNone(self.quiz.question)
+        self.assertIsNone(self.quiz._question)
 
     def test_stop_question(self):
         self.quiz.start_question(1)
         response = self.fetch('/api/stopQuestion', method='POST', body='')
         self.assertEqual(200, response.code)
         self.assertDictEqual({}, json.loads(response.body))
-        self.assertIsNone(self.quiz.question)
+        self.assertIsNone(self.quiz._question)
 
 
 class SetAnswerPointsApiTest(BaseTestCase):
@@ -220,13 +226,13 @@ class GetUpdatesApiTest(BaseTestCase):
             registration=False,
             time='2020-02-03 04:05:06',
         ))
-        self.quiz.quiz_db.get_answers = MagicMock(return_value=[
+        self.quiz._quiz_db.get_answers = MagicMock(return_value=[
             Answer(quiz_id='test', question=5, team_id=5001,
                    answer='Apple', timestamp=1234, update_id=201, points=3),
             Answer(quiz_id='test', question=8, team_id=5002,
                    answer='Unicode Юнікод', timestamp=1236, update_id=202, points=None),
         ])
-        self.quiz.quiz_db.get_teams = MagicMock(return_value=[
+        self.quiz._quiz_db.get_teams = MagicMock(return_value=[
             Team(quiz_id='test', id=5001, name='Liverpool',
                  timestamp=1235, update_id=301),
             Team(quiz_id='test', id=5002, name='Tottenham',
@@ -263,16 +269,16 @@ class GetUpdatesApiTest(BaseTestCase):
             ],
         }, json.loads(response.body))
         self.quiz.get_status.assert_called_once()
-        self.quiz.quiz_db.get_teams.assert_called_with(
+        self.quiz._quiz_db.get_teams.assert_called_with(
             quiz_id='test', min_update_id=456)
-        self.quiz.quiz_db.get_answers.assert_called_with(
+        self.quiz._quiz_db.get_answers.assert_called_with(
             quiz_id='test', min_update_id=789)
 
     def test_ignores_status(self):
         update_id = self.quiz.status_update_id
         self.quiz.get_status = MagicMock()
-        self.quiz.quiz_db.get_answers = MagicMock(return_value=[])
-        self.quiz.quiz_db.get_teams = MagicMock(return_value=[])
+        self.quiz._quiz_db.get_answers = MagicMock(return_value=[])
+        self.quiz._quiz_db.get_teams = MagicMock(return_value=[])
         request = {
             'min_status_update_id': update_id+1,
             'min_teams_update_id': 456,
@@ -287,9 +293,9 @@ class GetUpdatesApiTest(BaseTestCase):
             'answers': [],
         }, json.loads(response.body))
         self.quiz.get_status.assert_not_called()
-        self.quiz.quiz_db.get_teams.assert_called_with(
+        self.quiz._quiz_db.get_teams.assert_called_with(
             quiz_id='test', min_update_id=456)
-        self.quiz.quiz_db.get_answers.assert_called_with(
+        self.quiz._quiz_db.get_answers.assert_called_with(
             quiz_id='test', min_update_id=789)
 
     def test_long_polling_status_change(self):
@@ -322,7 +328,7 @@ class GetUpdatesApiTest(BaseTestCase):
 
     def test_long_polling_db_change(self):
         request = {
-            'min_status_update_id': 1,
+            'min_status_update_id': self.quiz.status_update_id + 1,
             'min_teams_update_id': 1,
             'min_answers_update_id': 1,
             'timeout': 3,
@@ -386,7 +392,7 @@ class GetUpdatesApiTest(BaseTestCase):
 
     def test_long_polling_instant_db_update(self):
         request = {
-            'min_status_update_id': 1,
+            'min_status_update_id': self.quiz.status_update_id + 1,
             'min_teams_update_id': 1,
             'min_answers_update_id': 1,
             'timeout': 3,
@@ -417,7 +423,7 @@ class GetUpdatesApiTest(BaseTestCase):
 
     def test_long_polling_timeout(self):
         request = {
-            'min_status_update_id': 2,
+            'min_status_update_id': self.quiz.status_update_id + 2,
             'min_teams_update_id': 1,
             'min_answers_update_id': 1,
             'timeout': 0.5,
