@@ -198,6 +198,22 @@ class SetAnswerPointsApiTest(StartedQuizBaseTestCase):
         self.quiz_db.set_answer_points.assert_called_with(
             quiz_id='test', question=4, team_id=5001, points=17)
 
+    def test_stopped_quiz(self):
+        self.quiz_db.set_answer_points = MagicMock(return_value=4)
+        self.quiz.stop()
+        request = {
+            'question': 4,
+            'team_id': 5001,
+            'points': 17,
+        }
+
+        response = self.fetch('/api/setAnswerPoints', method='POST',
+                              body=json.dumps(request))
+
+        self.assertIn('error', json.loads(response.body))
+        self.assertEqual(400, response.code)
+        self.quiz_db.set_answer_points.assert_not_called()
+
     def test_non_existing_answer(self):
         self.quiz_db.set_answer_points = MagicMock(return_value=0)
         request = {
@@ -334,6 +350,55 @@ class GetUpdatesApiTest(StartedQuizBaseTestCase):
             quiz_id='test', min_update_id=456)
         self.quiz._quiz_db.get_answers.assert_called_with(
             quiz_id='test', min_update_id=789)
+
+    def test_stopped_quiz(self):
+        update_id = self.quiz.status_update_id
+        self.quiz.get_status = MagicMock(return_value=QuizStatus(
+            update_id=101,
+            quiz_id=None,
+            language=None,
+            question=None,
+            registration=False,
+            time='2020-02-03 04:05:06',
+        ))
+        self.quiz._quiz_db.get_answers = MagicMock(return_value=[
+            Answer(quiz_id='test', question=5, team_id=5001,
+                   answer='Apple', timestamp=1234, update_id=201, points=3),
+            Answer(quiz_id='test', question=8, team_id=5002,
+                   answer='Unicode Юнікод', timestamp=1236, update_id=202, points=None),
+        ])
+        self.quiz._quiz_db.get_teams = MagicMock(return_value=[
+            Team(quiz_id='test', id=5001, name='Liverpool',
+                 timestamp=1235, update_id=301),
+            Team(quiz_id='test', id=5002, name='Tottenham',
+                 timestamp=1237, update_id=302),
+        ])
+
+        self.quiz.stop()
+
+        request = {
+            'min_status_update_id': update_id,
+            'min_teams_update_id': 456,
+            'min_answers_update_id': 789,
+        }
+        response = self.fetch('/api/getUpdates', method='POST',
+                              body=json.dumps(request))
+        self.assertEqual(200, response.code)
+        self.assertDictEqual({
+            'status': {
+                'update_id': 101,
+                'quiz_id': None,
+                'language': None,
+                'question': None,
+                'registration': False,
+                'time': '2020-02-03 04:05:06'
+            },
+            'teams': [],
+            'answers': [],
+        }, json.loads(response.body))
+        self.quiz.get_status.assert_called_once()
+        self.quiz._quiz_db.get_teams.assert_not_called()
+        self.quiz._quiz_db.get_answers.assert_not_called()
 
     def test_ignores_status(self):
         update_id = self.quiz.status_update_id

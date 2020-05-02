@@ -27,8 +27,8 @@ class Strings:
 @dataclass
 class QuizStatus:
     update_id: int
-    quiz_id: str
-    language: str
+    quiz_id: Optional[str]
+    language: Optional[str]
     question: Optional[int]
     registration: bool
     time: str = field(default=None, compare=False)
@@ -94,6 +94,7 @@ class TelegramQuiz:
         start_time = time.time()
         with self._lock:
             if self._registration_handler is None:
+                logging.warning('Skipping registration update as registration closed.')
                 return
             chat_id = update.message.chat_id
             message: telegram.message.Message = update.message
@@ -125,16 +126,18 @@ class TelegramQuiz:
 
     def start_registration(self):
         with self._lock:
+            if not self._id:
+                raise TelegramQuizError('Can not start registration, because quiz is not started.')
             if self._question is not None:
-                logging.warning(f'Trying to start registration for quiz "{self._id}", '
-                                f'when question {self._question} is running.')
+                logging.warning(f'Can not start registration for quiz "{self._id}", '
+                                f'because question {self._question} is already started.')
                 raise TelegramQuizError(
                     f'Can not start registration of quiz "{self._id}" when question {self._question} is running.')
             if self._registration_handler:
                 logging.warning(
-                    f'Trying to start registration for quiz "{self._id}", but registration is already running.')
+                    f'Can not start registration for quiz "{self._id}", because registration is already started.')
                 raise TelegramQuizError(
-                    f'Can not start registration of quiz "{self._id}" because registration is already on.')
+                    f'Can not start registration of quiz "{self._id}" because registration is already started.')
             self._registration_handler = telegram.ext.MessageHandler(
                 telegram.ext.Filters.text, self._handle_registration_update)
             self._updater.dispatcher.add_handler(
@@ -144,11 +147,14 @@ class TelegramQuiz:
 
     def stop_registration(self):
         with self._lock:
+            if not self._id:
+                logging.warning('Can not stop registration, because quiz is not started.')
+                raise TelegramQuizError('Can not stop registration, because quiz is not started.')
             if not self._registration_handler:
                 logging.warning(
-                    f'Trying to stop registration for quiz "{self._id}", but registration was not running.')
+                    f'Can not stop registration for quiz "{self._id}", because registration is not started.')
                 raise TelegramQuizError(
-                    f'Can not stop registration of quiz "{self._id}" because registration is not running.')
+                    f'Can not stop registration of quiz "{self._id}" because registration is not started.')
             self._updater.dispatcher.remove_handler(
                 self._registration_handler, group=1)
             self._registration_handler = None
@@ -162,6 +168,7 @@ class TelegramQuiz:
         start_time = time.time()
         with self._lock:
             if self._question is None:
+                logging.warning('Answer update skipped as question is not started.')
                 return
             chat_id = update.message.chat_id
             answer = update.message.text
@@ -201,9 +208,12 @@ class TelegramQuiz:
         with self._lock:
             if not isinstance(question, int):
                 raise Exception('Parameter question must be an integer.')
+            if not self._id:
+                raise TelegramQuizError(
+                    f'Can not start question {question}, because quiz is not started.')
             if self._registration_handler:
-                logging.warning(f'Trying to start question {question} for quiz "{self._id}", '
-                                f'but the registration is not finished.')
+                logging.warning(f'Can not start question {question} for quiz "{self._id}", '
+                                f'because registration is started.')
                 raise TelegramQuizError(
                     'Can not start a question during registration.')
             if self._question is not None:
@@ -222,11 +232,13 @@ class TelegramQuiz:
 
     def stop_question(self):
         with self._lock:
+            if not self._id:
+                raise TelegramQuizError('Can not stop a question, because quiz is not started.')
             if self._question is None:
                 logging.warning(
-                    f'Attempt to stop a question, but no question was running. quiz_id: "{self._id}".')
+                    f'Can not stop a question, because question is not started. quiz_id: "{self._id}".')
                 raise TelegramQuizError(
-                    'Can not stop a question, when no question is running.')
+                    'Can not stop a question, because question is not started.')
             self._updater.dispatcher.remove_handler(
                 self._question_handler, group=1)
             self._question = None
@@ -266,7 +278,7 @@ class TelegramQuiz:
             updater_factory = default_updater_factory
 
         with self._lock:
-            if self._id is not None:
+            if self._id:
                 raise TelegramQuizError(f'Could not start quiz "{quiz_id}", '
                                         f'because quiz "{self._id}" is already running.')
 
@@ -289,6 +301,8 @@ class TelegramQuiz:
             self._id = None
             self._language = None
             self._strings = None
+            self._registration_handler = None
+            self._question_handler = None
             self._on_status_update()
 
     def _on_status_update(self):
@@ -300,8 +314,16 @@ class TelegramQuiz:
                 logging.exception('Subscriber raised an error.')
 
     @property
+    def id(self) -> Optional[str]:
+        return self._id
+
+    @property
     def status_update_id(self) -> int:
         return self._status_update_id
+
+    @property
+    def db(self) -> QuizDb:
+        return self._quiz_db
 
     def get_status(self) -> QuizStatus:
         with self._lock:
@@ -315,24 +337,27 @@ class TelegramQuiz:
             )
 
     def send_results(self, *, team_id: int) -> None:
-        teams = self._quiz_db.get_teams(quiz_id=self._id, team_id=team_id)
+        with self._lock:
+            if not self._id:
+                raise TelegramQuizError(f'Could not send results to team {team_id}, because the quiz is not started.')
+            teams = self._quiz_db.get_teams(quiz_id=self._id, team_id=team_id)
 
-        if not teams:
-            raise TelegramQuizError(f'Team with id {team_id} does not exist.')
+            if not teams:
+                raise TelegramQuizError(f'Team with id {team_id} does not exist.')
 
-        answers = self._quiz_db.get_answers(
-            quiz_id=self._id, team_id=team_id)
+            answers = self._quiz_db.get_answers(
+                quiz_id=self._id, team_id=team_id)
 
-        correct_answers = sorted(
-            [a.question for a in answers if bool(a.points)])
+            correct_answers = sorted(
+                [a.question for a in answers if bool(a.points)])
 
-        if not correct_answers:
-            message = self._strings.send_results_zero_correct_answers
-        else:
-            str_answers = ', '.join(
-                [str(a) for a in correct_answers])
-            message = self._strings.send_results_correct_answers.format(
-                correctly_answered_questions=str_answers, total_score=len(correct_answers))
+            if not correct_answers:
+                message = self._strings.send_results_zero_correct_answers
+            else:
+                str_answers = ', '.join(
+                    [str(a) for a in correct_answers])
+                message = self._strings.send_results_correct_answers.format(
+                    correctly_answered_questions=str_answers, total_score=len(correct_answers))
 
         try:
             self._updater.bot.send_message(team_id, message)

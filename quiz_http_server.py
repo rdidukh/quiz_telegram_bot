@@ -90,10 +90,15 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
             status = self.quiz.get_status()
         else:
             status = None
-        teams = self.quiz._quiz_db.get_teams(
-            quiz_id=self.quiz._id, min_update_id=min_teams_update_id)
-        answers = self.quiz._quiz_db.get_answers(
-            quiz_id=self.quiz._id, min_update_id=min_answers_update_id)
+
+        if self.quiz.id:
+            teams = self.quiz.db.get_teams(
+                quiz_id=self.quiz.id, min_update_id=min_teams_update_id)
+            answers = self.quiz.db.get_answers(
+                quiz_id=self.quiz.id, min_update_id=min_answers_update_id)
+        else:
+            teams = []
+            answers = []
 
         return {
             'status': status.__dict__ if status else None,
@@ -132,7 +137,7 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
 
         try:
             self.quiz.add_updates_subscriber(self._notify)
-            self.quiz._quiz_db.add_updates_subscriber(self._notify)
+            self.quiz.db.add_updates_subscriber(self._notify)
 
             await tornado.ioloop.IOLoop.current().run_in_executor(None,
                                                                   functools.partial(self._wait, timeout=timeout))
@@ -143,7 +148,7 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
             return updates
         finally:
             self.quiz.remove_updates_subscriber(self._notify)
-            self.quiz._quiz_db.remove_updates_subscriber(self._notify)
+            self.quiz.db.remove_updates_subscriber(self._notify)
 
     def on_connection_close(self):
         logging.warning('Connection closed by the client.')
@@ -163,14 +168,17 @@ class SetAnswerPointsApiHandler(BaseQuizRequestHandler):
         team_id = self.get_param_value(request, 'team_id', int)
         points = self.get_param_value(request, 'points', int)
 
-        update_id = self.quiz._quiz_db.set_answer_points(
-            quiz_id=self.quiz._id,
+        if not self.quiz.id:
+            return {'error': 'Quiz is not started.'}
+
+        update_id = self.quiz.db.set_answer_points(
+            quiz_id=self.quiz.id,
             question=question,
             team_id=team_id,
             points=points)
 
         if not update_id:
-            return {'error': f'Answer for quiz "{self.quiz._id}", question {question}, team {team_id} does not exist.'}
+            return {'error': f'Answer for quiz "{self.quiz.id}", question {question}, team {team_id} does not exist.'}
 
         return {}
 

@@ -107,16 +107,24 @@ class StopTest(StartedQuizBaseTestCase):
         self.assertEqual(update_id+1, self.quiz.status_update_id)
         sub.assert_called_with()
 
-    def raises_when_already_stopped(self):
+    def test_raises_when_already_stopped(self):
+        self.quiz.stop()
         sub = MagicMock()
         self.quiz.add_updates_subscriber(sub)
         update_id = self.quiz.status_update_id
 
-        self.quiz.stop()
-
         self.assertRaises(TelegramQuizError, self.quiz.stop)
+
         self.assertEqual(update_id, self.quiz.status_update_id)
         sub.assert_not_called()
+
+    def test_stops_registration(self):
+        self.quiz.stop()
+        self.assertIsNone(self.quiz._registration_handler)
+
+    def test_stops_question(self):
+        self.quiz.stop()
+        self.assertIsNone(self.quiz._question_handler)
 
 
 class StartRegistrationTest(StartedQuizBaseTestCase):
@@ -141,6 +149,10 @@ class StartRegistrationTest(StartedQuizBaseTestCase):
         self.assertRaises(TelegramQuizError, self.quiz.start_registration)
         self.assertEqual(update_id, self.quiz.status_update_id)
 
+    def test_raises_when_quiz_not_started(self):
+        self.quiz.stop()
+        self.assertRaisesRegex(TelegramQuizError, 'not started', self.quiz.start_registration)
+
 
 class StopRegistrationTest(StartedQuizBaseTestCase):
     def test_stops_registration(self):
@@ -156,6 +168,10 @@ class StopRegistrationTest(StartedQuizBaseTestCase):
         update_id = self.quiz.status_update_id
         self.assertRaises(TelegramQuizError, self.quiz.stop_registration)
         self.assertEqual(update_id, self.quiz.status_update_id)
+
+    def test_raises_when_quiz_not_started(self):
+        self.quiz.stop()
+        self.assertRaisesRegex(TelegramQuizError, 'not started', self.quiz.stop_registration)
 
 
 class StartQuestionTest(StartedQuizBaseTestCase):
@@ -181,6 +197,10 @@ class StartQuestionTest(StartedQuizBaseTestCase):
                           self.quiz.start_question, question=1)
         self.assertEqual(update_id, self.quiz.status_update_id)
 
+    def test_raises_when_quiz_not_started(self):
+        self.quiz.stop()
+        self.assertRaisesRegex(TelegramQuizError, 'not started', self.quiz.start_question, 1)
+
 
 class StopQuestionTest(StartedQuizBaseTestCase):
     def test_stops_question(self):
@@ -198,6 +218,10 @@ class StopQuestionTest(StartedQuizBaseTestCase):
         self.assertRaises(TelegramQuizError,
                           self.quiz.stop_question)
         self.assertEqual(update_id, self.quiz.status_update_id)
+
+    def test_raises_when_quiz_not_started(self):
+        self.quiz.stop()
+        self.assertRaisesRegex(TelegramQuizError, 'not started', self.quiz.stop_question)
 
 
 class HandleLogUpdateTest(BaseTestCase):
@@ -434,6 +458,12 @@ class GetStatusTest(StartedQuizBaseTestCase):
         status = self.quiz.get_status()
         self.assertEqual(1, status.question)
 
+    def test_stop(self):
+        self.quiz.stop()
+        status = self.quiz.get_status()
+        self.assertIsNone(status.quiz_id)
+        self.assertIsNone(status.language)
+
 
 class SendResultsTest(StartedQuizBaseTestCase):
 
@@ -521,6 +551,10 @@ class SendResultsTest(StartedQuizBaseTestCase):
 
         self.assertRaisesRegex(TelegramQuizError, 'does not exist',
                                self.quiz.send_results, team_id=5001)
+
+    def test_raises_when_quiz_not_started(self):
+        self.quiz.stop()
+        self.assertRaisesRegex(TelegramQuizError, 'not started', self.quiz.send_results, team_id=5001)
 
 
 if __name__ == '__main__':
