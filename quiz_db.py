@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import logging
 import sqlite3
 import threading
+import time
 from typing import Callable, List, Tuple, Optional, Set
 
 
@@ -34,6 +35,12 @@ class Team:
     name: str
     timestamp: int
     update_id: int = field(default=None, compare=False)
+
+@dataclass
+class Quiz:
+    id: str
+    update_id: int
+    timestamp: int
 
 
 class QuizDb:
@@ -206,6 +213,39 @@ class QuizDb:
                     ))
         return teams
 
+    def update_quiz(self, quiz_id: str) -> int:
+        with self._db_lock, contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            with db:
+                (update_id,) = db.execute('SELECT update_id FROM quizzes WHERE quiz_id = ?',
+                                          (quiz_id,)).fetchone() or (0,)
+                timestamp = int(time.time())
+
+                (last_update_id,) = db.execute('SELECT MAX(update_id) FROM quizzes').fetchone() or (0,)
+                new_update_id = last_update_id + 1
+
+                if not update_id:
+                    db.execute('INSERT INTO quizzes (update_id, id, timestamp) VALUES ()', (new_update_id, quiz_id, timestamp))
+                else:
+                    db.execute('UPDATE quizzes SET update_id = ?, timestamp = ?', (new_update_id, timestamp))
+        self._on_update()
+        return new_update_id
+
+    def get_quiz(self, quiz_id: str, min_update_id: int = 0) -> Optional[Quiz]:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            cursor = db.execute('SELECT (update_id, id, timestamp) FROM quizzes WHERE id = ? AND min_update_id = ?', (quiz_id, min_update_id))
+            (update_id, quiz_id, timestamp) = cursor.fetchone() or (0, '', 0)
+            if not update_id:
+                return None
+        return Quiz(id=quiz_id, update_id=update_id, timestamp=timestamp)
+
+    def get_quizzes(self) -> List[Quiz]:
+        quizzes: List[Quiz] = []
+        with contextlib.closing(sqlite3.connect(self.db_path)) as db:
+            cursor = db.execute('SELECT (update_id, id, timestamp) FROM quizzes')
+            for (update_id, quiz_id, timestamp) in cursor:
+               quizzes.append(Quiz(id=quiz_id, update_id=update_id, timestamp=timestamp))
+        return quizzes
+
     def insert_message(self, message: Message):
         insert_timestamp = message.insert_timestamp or int(
             datetime.utcnow().timestamp())
@@ -257,3 +297,13 @@ class QuizDb:
                     update_id INTEGER NOT NULL,
                     chat_id INTEGER NOT NULL,
                     text TEXT NOT NULL)''')
+                db.execute('''CREATE TABLE IF NOT EXISTS quizzes (
+                    update_id INTEGER PRIMARY KEY NOT NULL,
+                    quiz_id TEXT NOT NULL,
+                    started INTEGER NON NULL,
+                    language TEXT NOT NULL,
+                    question INTEGER NOT NULL,
+                    number_of_questions NOT NULL,
+                    registration INTEGER NOT NULL,
+                    timestamp INTEGER NOT NULL
+                )''')

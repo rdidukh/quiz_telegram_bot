@@ -20,6 +20,7 @@ export class QuizController {
         this.answersIndex = new Map()
         this.runningQuestion = null
         this.currentQuestion = 1
+        this.quizId = null
         this.lastSeenStatusUpdateId = 0
         this.lastSeenTeamsUpdateId = 0
         this.lastSeenAnswersUpdateId = 0
@@ -265,6 +266,7 @@ export class QuizController {
         if (updates.status) {
             this.lastSeenStatusUpdateId = updates.status.update_id
             this.runningQuestion = updates.status.question
+            this.quizId = updates.status.quiz_id
             console.log('Status update. update_id: ' + updates.status.update_id)
             this.updateStatusTable(updates.status)
             this.updateStartStopQuestionButtons(updates.status)
@@ -320,6 +322,10 @@ export class QuizController {
 }
 
 if (typeof (window) !== 'undefined') {
+    const url = new URL(window.location.href)
+
+    const quizId = url.searchParams.get('id')
+
     window.onload = () => {
         const api = new Api(fetch.bind(window))
         const controller = new QuizController(document, api)

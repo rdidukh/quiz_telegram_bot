@@ -85,20 +85,17 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
         with self.cond:
             self.cond.notify()
 
-    def _get_updates(self, min_status_update_id: int, min_teams_update_id: int, min_answers_update_id: int) -> Dict[str, Any]:
+    def _get_updates(self, quiz_id: str, min_status_update_id: int, min_teams_update_id: int, min_answers_update_id: int) -> Dict[str, Any]:
         if self.quiz.status_update_id >= min_status_update_id:
             status = self.quiz.get_status()
         else:
             status = None
 
-        if self.quiz.id:
-            teams = self.quiz.db.get_teams(
+        quiz = self.quiz.db.get_quiz(quiz_id=quiz_id, min_update_id=min_status_update_id)
+        teams = self.quiz.db.get_teams(
                 quiz_id=self.quiz.id, min_update_id=min_teams_update_id)
-            answers = self.quiz.db.get_answers(
+        answers = self.quiz.db.get_answers(
                 quiz_id=self.quiz.id, min_update_id=min_answers_update_id)
-        else:
-            teams = []
-            answers = []
 
         return {
             'status': status.__dict__ if status else None,
@@ -110,6 +107,7 @@ class GetUpdatesApiHandler(BaseQuizRequestHandler):
         return not updates.get('status') and not updates.get('teams') and not updates.get('answers')
 
     async def handle_quiz_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        quiz_id = self.get_param_value(request, 'quiz_id', str)
         min_status_update_id = self.get_param_value(
             request, 'min_status_update_id', int)
         min_teams_update_id = self.get_param_value(
@@ -217,7 +215,8 @@ class StartQuizApiHandler(BaseQuizRequestHandler):
         quiz_id = self.get_param_value(request, 'quiz_id', str)
         bot_api_token = self.get_param_value(request, 'bot_api_token', str)
         language = self.get_param_value(request, 'language', str)
-        self.quiz.start(quiz_id=quiz_id, bot_api_token=bot_api_token, language=language)
+        self.quiz.start(quiz_id=quiz_id,
+                        bot_api_token=bot_api_token, language=language)
         return {}
 
 
