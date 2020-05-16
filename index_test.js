@@ -697,4 +697,53 @@ describe('Index', () => {
             assert.equal(header.classList.contains('running_question'), false)
         })
     })
+
+    describe('SetNonReviewedAnswersPointsTo', () => {
+        it('#setsPoints', () => {
+            controller.currentQuestion = 2;
+
+            controller.teamsIndex = new Map([
+                [5001, { name: 'Austria' }],
+                [5002, { name: 'Belgium' }],
+                [5003, { name: 'Croatia' }],
+                [5004, { name: 'Denmark' }],
+            ])
+            controller.answersIndex = new Map([
+                [2, new Map([
+                    [5001, { answer: 'Apple' }],
+                    [5002, { answer: 'Banana', points: 0 }],
+                    [5003, { answer: 'Cranberries', points: null }],
+                ])],
+            ])
+
+            controller.setNonReviewedAnswersPointsTo(3)
+
+            assert.deepEqual(api.setAnswerPointsCalls.sort(), [
+                [2, 5001, 3],
+                [2, 5003, 3],
+                [2, 5004, 3],
+            ])
+        })
+
+        it('#noAnswers', () => {
+            controller.currentQuestion = 2;
+
+            controller.teamsIndex = new Map([
+                [5001, { name: 'Austria' }],
+                [5002, { name: 'Belgium' }],
+                [5003, { name: 'Croatia' }],
+                [5004, { name: 'Denmark' }],
+            ])
+            controller.answersIndex = new Map()
+
+            controller.setNonReviewedAnswersPointsTo(3)
+
+            assert.deepEqual(api.setAnswerPointsCalls.sort(), [
+                [2, 5001, 3],
+                [2, 5002, 3],
+                [2, 5003, 3],
+                [2, 5004, 3],
+            ])
+        })
+    })
 })

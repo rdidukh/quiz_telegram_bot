@@ -61,6 +61,10 @@ export class QuizController {
         }
 
         this.hightlightResultsTable()
+
+        const answersTable = this.document.getElementById('answers_table')
+        answersTable.rows[0].cells[2].ondblclick = () => this.setNonReviewedAnswersPointsTo(1)
+        answersTable.rows[0].cells[3].ondblclick = () => this.setNonReviewedAnswersPointsTo(0)
     }
 
     updateStatusTable(status) {
@@ -200,6 +204,19 @@ export class QuizController {
         } else {
             startButton.classList.remove('disabled')
             stopButton.classList.add('disabled')
+        }
+    }
+
+    setNonReviewedAnswersPointsTo(points) {
+        for (const [teamId, team] of this.teamsIndex) {
+            let answers = new Map()
+            if (this.answersIndex.has(this.currentQuestion)) {
+                answers = this.answersIndex.get(this.currentQuestion)
+            }
+
+            if (!answers.has(teamId) || answers.get(teamId).points == null) {
+                this.api.setAnswerPoints(this.currentQuestion, teamId, points)
+            }
         }
     }
 

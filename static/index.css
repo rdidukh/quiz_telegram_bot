@@ -43,6 +43,10 @@ table, th, td {
     padding-left: 2px;
 }
 
+#answers_table th {
+    cursor: pointer;
+}
+
 #answers_table th:first-child {
     width: 10em
 }
